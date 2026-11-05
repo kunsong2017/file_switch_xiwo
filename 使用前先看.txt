@@ -1,40 +1,26 @@
-题页 · 试卷转 PPT / 希沃课件
+题页 · 试卷转 PPT / 希沃课件 · 免安装离线版
 
-请先完整解压压缩包，再启动。不要在压缩软件内部运行。
+Windows 使用方法：
+1. 完整解压压缩包，不要在压缩软件里直接运行。
+2. 双击同一文件夹中的 index.html，用 Microsoft Edge 或 Google Chrome 打开。
+   如果默认打开的是其他程序，右键 index.html → 打开方式 → Microsoft Edge。
+3. 选择 PDF 或 Word（.docx）试卷，检查分题结果后导出。
 
-Windows：
-1. 电脑需要安装 Python 3.8 或更新版本，只需安装一次：
-   https://www.python.org/downloads/windows/
-2. 双击本文件旁边的「启动题页.bat」。
-3. 浏览器会自动打开题页，通常是 http://127.0.0.1:5187/ 。
-   如果没有自动打开，请复制启动窗口中显示的网址到浏览器。
-4. 使用期间保持启动窗口开启，结束后关闭窗口即可。
-
-macOS / Linux：
-在解压后的文件夹打开终端，运行：
-   sh ./启动题页.sh
-需要 Python 3.8 或更新版本。
-
-旧包或手动启动（在含 scripts 和 dist 文件夹的目录中）：
-Windows：py -3 scripts/serve.py --open
-macOS / Linux：python3 scripts/serve.py --open
-
-为什么双击 index.html 会空白？
-这是一个需要通过网页服务打开的应用。根目录 index.html 是源码入口；
-dist/index.html 是构建后的入口，也需要 HTTP 地址加载脚本、字体和识别引擎。
-双击 HTML 会使用 file:// 地址，浏览器会限制这些资源的加载。
-使用上面的启动入口后，浏览器通过本机 HTTP 地址打开，文件仍只在浏览器中处理。
-
-必须安装本地 Python 吗？
-这些离线启动脚本需要 Python，但试卷处理、识别、PPTX / ENBX 导出本身不依赖 Python。
-访问已经部署好的网页时，使用者电脑不需要安装 Python。
+不需要 Python、不需要 Node.js、不需要命令行，也不需要启动本地服务。
+程序、PDF 字体、中英文 OCR 引擎及示例均在 HTML 内，断网也能使用。
+HTML 约 17 MB，首次打开请稍候。macOS / Linux 也可用 Chrome 打开。
 
 导出格式：
 PowerPoint：标准 .pptx，题干是图片，标题可编辑。
 希沃导入版：整页图片 .pptx，在希沃白板中选择「导入课件」。
 希沃原生：.enbx（试用），整页图片，每题一页，用希沃白板 5 打开。
-原生课件已经过结构和独立读取器校验，仍需在你的实际希沃版本检查兼容性。
+原生课件经过结构和独立读取器校验，实际希沃版本兼容性仍需确认。
 
-如果提示缺少 dist/index.html：
-你可能下载的是 GitHub 的源码 ZIP。源码包需先按 README 构建；
-已构建的完整交付包应包含 dist、scripts 和启动入口。
+扫描试卷可点击「扫描件 OCR」；识别后请检查选框，必要时手动框选或调整。
+旧版 .doc 请先用 Word / WPS 另存为 .docx 或 PDF。
+文件在浏览器本地处理，不上传试卷。刷新或关闭页面会清空当前工作。
+
+如果双击后仍看到要求 Python 的旧提示，请重新解压「免安装离线版」，
+不要使用旧包或 GitHub 源码包中的 index.html。
+GitHub 的 Download ZIP 是源码，供开发者构建；免安装包才含可直接运行的 HTML。
+licenses 文件夹保存第三方授权文本，请随程序一起保留。

@@ -3,6 +3,7 @@ import {createIcons, FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus,
 import {readDocument, recognizePages} from './document.js';
 import {segmentPages, normalizeCrop, splitQuestion, clamp} from './segment.js';
 import {composeQuestion, exportPPTX, themes} from './export.js';
+import {resourceURL} from './offline.js';
 
 const app = document.getElementById('app');
 const iconSet = {FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus, X, Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Scissors, Layers, ScanLine, MousePointer2, Undo2, Trash2, ZoomIn, ZoomOut, CircleHelp, ShieldCheck, Monitor, Settings2, BookOpen, Presentation, Sparkles, RotateCcw, Columns2, Crop, CircleCheck};
@@ -95,6 +96,7 @@ function render() {
   const paperScroll = document.querySelector('.paper-scroll')?.scrollTop || 0;
   const listScroll = document.querySelector('.question-list')?.scrollTop || 0;
   app.innerHTML = `<div class="app-shell">${sidebar()}<main>${header()}${state.file ? workspace() : emptyState()}</main></div><input id="file-input" type="file" accept=".pdf,.docx,.doc" hidden/>${state.modal === 'settings' ? settingsModal() : state.modal === 'help' ? helpModal() : ''}${state.busy ? `<div class="busy-overlay" role="alert" aria-busy="true"><div class="busy-card"><span class="busy-spinner"></span><h3 id="progress-label">${esc(state.message)}</h3><p>文件在本机处理，请稍等片刻</p><div class="progress-track"><div id="progress-bar" style="width:${state.progress * 100}%"></div></div></div></div>` : ''}`;
+  app.querySelectorAll('a[href^="/examples/"]').forEach(link => {link.href = resourceURL(link.getAttribute('href'));});
   createIcons({icons: iconSet});
   const paper = document.querySelector('.paper-scroll');
   if (paper) paper.scrollTop = paperScroll;
@@ -132,7 +134,7 @@ async function importFile(file) {
 }
 async function loadDemo() {
   try {
-    const response = await fetch('/examples/数学示例试卷.pdf');
+    const response = await fetch(resourceURL('/examples/数学示例试卷.pdf', 'application/pdf'));
     if (!response.ok) throw new Error('示例文件加载失败');
     await importFile(new File([await response.blob()], '数学示例试卷.pdf', {type: 'application/pdf'}));
   } catch (e) {toast(e.message);}

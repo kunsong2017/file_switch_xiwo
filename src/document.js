@@ -2,7 +2,9 @@ import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {renderAsync} from 'docx-preview';
 import {toCanvas} from 'html-to-image';
+import {configureOfflinePDF, offlineOCR} from './offline.js';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+const offlinePDFOptions = configureOfflinePDF(pdfjs);
 
 export async function readDocument(file, onProgress) {
   const ext = file.name.split('.').pop().toLowerCase();
@@ -17,7 +19,7 @@ export async function readDocument(file, onProgress) {
 async function readPDF(data, onProgress) {
   let doc;
   try {
-    doc = await pdfjs.getDocument({data, cMapUrl: '/pdf/cmaps/', cMapPacked: true, standardFontDataUrl: '/pdf/fonts/', isEvalSupported: false}).promise;
+    doc = await pdfjs.getDocument({data, cMapUrl: '/pdf/cmaps/', cMapPacked: true, standardFontDataUrl: '/pdf/fonts/', isEvalSupported: false, ...offlinePDFOptions}).promise;
     if (doc.numPages > 60) throw new Error('当前一次最多处理 60 页，请先拆分试卷。');
     const pages = [];
     let pixelBudget = 0;
@@ -189,8 +191,9 @@ export async function recognizePages(pages, onProgress) {
   let worker;
   let index = 0;
   try {
-    worker = await createWorker(['chi_sim', 'eng'], 1, {
-      workerPath: '/ocr/worker.min.js', corePath: '/ocr/core', langPath: '/ocr/lang',
+    const offline = offlineOCR();
+    worker = await createWorker(offline.languages, 1, {
+      ...offline.options,
       logger: message => onProgress(`本地 OCR · 第 ${index + 1} / ${pages.length} 页 · ${message.status === 'recognizing text' ? '识别题号' : '准备识别引擎'}`, (index + (message.progress || 0)) / pages.length),
     });
     for (index = 0; index < pages.length; index++) {

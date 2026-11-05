@@ -1,5 +1,6 @@
 node_modules/
 dist/
+offline/
 dist-next/
 test-results/
 *.log

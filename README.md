@@ -33,27 +33,30 @@
 
 ## 启动
 
-完整交付包先解压，然后启动：
+**免安装离线包：完整解压后，双击 `index.html`，用 Edge 或 Chrome 打开即可。** 不需要 Python、Node.js、命令行或本地服务器；断网可用。PDF 字体、中英文 OCR 引擎、语言包、示例及应用程序都内嵌在约 17 MB 的 HTML 中。浏览器默认打开方式不正确时，右键文件选择「打开方式 → Microsoft Edge」。
 
-- **Windows**：安装一次 [Python 3](https://www.python.org/downloads/windows/)，然后双击 `启动题页.bat`。
-- **macOS / Linux**：运行 `sh ./启动题页.sh`，需要 Python 3.8 或更新版本。
-- 浏览器会自动打开；如果没有，请复制启动窗口中的网址，通常是 `http://127.0.0.1:5187/`。使用期间保持启动窗口开启。
+发行包仅含可直接运行的 `index.html`、使用说明及第三方授权文本。不要在压缩软件内部打开，先解压。macOS / Linux 同样可用 Chrome 打开离线 HTML。
 
-交付包带有 `dist/`，不需要安装 Node.js。不要在压缩软件内运行，也不要双击根目录或 `dist/` 内的 `index.html`；本地 `file://` 地址无法正常加载应用模块和 PDF / OCR 资源。误打开 HTML 时页面会显示启动指引。
+GitHub 的「Download ZIP」是源码包，根目录 `index.html` 是开发入口，并非免安装版。开发者可按下方步骤构建，生成 `offline/index.html` 和免安装 ZIP：
 
-也可在解压目录手动启动：Windows 运行 `py -3 scripts/serve.py --open`，macOS / Linux 运行 `python3 scripts/serve.py --open`。
-
-GitHub 的「Download ZIP」是源码包，不包含生成的 `dist/`。下面的完整步骤仅用于从源码重建，需要 Node.js 22、npm 和 Python 3.8+：
+以下为开发构建环境，需要 Node.js 22、npm 和 Python 3.8+；使用者电脑不需要这些环境：
 
 ```sh
 npm ci
 npm run assets
 python3 scripts/download-languages.py
+npm run build:offline
+npm run package:offline
+```
+
+也可生成普通网页服务版本：
+
+```sh
 npm run build
 python3 scripts/serve.py
 ```
 
-浏览器打开 `http://localhost:5187`。同一网络访问可用 `python3 scripts/serve.py --bind 0.0.0.0`，然后使用服务器实际 IP。`dist/` 是完整静态站点，也可以部署在 HTTPS 静态托管服务；部署根目录须为 `dist/`。不要直接双击 HTML，PDF / OCR Worker 需要 HTTP 服务。
+浏览器打开 `http://localhost:5187`。同一网络访问可用 `python3 scripts/serve.py --bind 0.0.0.0`，然后使用服务器实际 IP。`dist/` 是普通静态站点，需 HTTP / HTTPS；可双击的版本是 `offline/index.html`。旧版 `启动题页.bat` / `.sh` 仅用于网页服务版本，免安装版不使用它们。
 
 开发调试：`npm run dev -- --port 5187`。首次准备依赖和 OCR 语言包需要联网，构建后核心转换不依赖外部 CDN。
 
@@ -70,7 +73,7 @@ python3 scripts/serve.py
 
 转换、OCR 和三种课件导出都在浏览器内运行，不调用 Python。访问已部署的网站不需要在使用者电脑安装 Python；`dist/` 可以放在普通静态 Web 服务器中。
 
-当前离线交付包的启动脚本使用 Python 3 提供本机 HTTP 服务，因此使用这些脚本时需要安装 Python。有 Node.js 开发环境时，构建后也可用 `npm run preview` 启动网页。无论采用哪种服务器，都应通过 HTTP / HTTPS 访问，不能直接双击 HTML。
+新的免安装离线包可直接双击 HTML，所有运行资源在文件中，不需要任何本地服务。Python 仅在开发者下载语言包、生成测试夹具或运行旧版服务脚本时使用。
 
 ## 验证
 
@@ -80,6 +83,7 @@ npm run dev -- --port 5187
 # 另一个终端；默认使用 /usr/bin/google-chrome，也可设置 CHROME_PATH
 npm run test:browser
 npm run test:enbx
+npm run test:offline
 ```
 
 单元测试覆盖题号、跨页、双栏和裁切边界；浏览器测试覆盖真实 PDF / DOCX、图片与公式、自动编号、长文档、框选、撤销、合并拆分、选中导出、16:9 / 4:3、移动端布局以及实际下载的 PPTX 页数与嵌入图片。原始原创示例在 `public/examples/`，重建示例：`python3 scripts/generate-examples.py`（需要 ReportLab、Pillow）。
@@ -96,4 +100,4 @@ npm run test:enbx
 
 GitHub Actions 配置位于 `.github/workflows/ci.yml`，包含干净安装、资源准备、单元测试、生产构建、浏览器导出及本地 OCR 测试，并上传静态站点产物。源码提交与网页发布相互独立。
 
-本地完整回归：启动 `python3 scripts/serve.py` 后运行 `npm run test:browser` 和 `npm run test:ocr`。需要交付完整离线静态包时，构建后运行 `python3 scripts/package_delivery.py`。
+本地网页回归：启动 `python3 scripts/serve.py` 后运行 `npm run test:browser` 和 `npm run test:ocr`。免安装版构建后运行 `npm run test:offline`，测试真实 ZIP 解压后的 file:// 入口，覆盖 PDF、Word、三种导出及扫描 OCR；测试浏览器设为断网，检测 HTTP 请求。执行 `npm run package:offline` 生成免安装 ZIP。旧版完整工程服务包仍可用 `python3 scripts/package_delivery.py` 生成。

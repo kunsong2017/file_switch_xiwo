@@ -32,6 +32,7 @@ jobs:
         run: |
           npm test
           npm run build
+          npm run build:offline
       - name: Install browser
         run: |
           npx playwright install --with-deps chromium
@@ -48,11 +49,21 @@ jobs:
           npm run test:enbx
           npm run test:ocr
           npm run test:package
+      - name: Test extracted standalone HTML without a server
+        run: |
+          npm run test:offline
+          npm run test:enbx
       - name: Upload static application
         uses: actions/upload-artifact@v4
         with:
           name: tiye-static-site
           path: dist/
+          retention-days: 7
+      - name: Upload double-click offline application
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiye-offline-html
+          path: offline/
           retention-days: 7
       - name: Upload browser results
         if: failure()

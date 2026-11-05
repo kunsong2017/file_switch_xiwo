@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "build:offline": "node scripts/build-offline.mjs",
+    "package:offline": "node scripts/package-offline.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "assets": "node scripts/prepare-assets.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:ocr": "node tests/ocr.mjs",
     "test:package": "node tests/package.mjs",
-    "test:enbx": "node tests/enbx-reader.mjs"
+    "test:enbx": "node tests/enbx-reader.mjs",
+    "test:offline": "node tests/offline.mjs"
   },
   "dependencies": {
     "docx-preview": "0.3.7",
