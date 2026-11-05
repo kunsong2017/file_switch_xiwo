@@ -9,7 +9,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <section style="max-width:640px;margin:12vh auto;padding:32px;font:16px/1.9 system-ui,sans-serif;color:#35452c;background:#f5f8ee;border:1px solid #dce6cd;border-radius:14px">
+        <h1 id="startup-title" style="font-size:24px;margin:0 0 16px">正在打开题页…</h1>
+        <p>如果没有进入工具页面，请使用解压文件夹中的启动入口：</p>
+        <p><strong>Windows：</strong>双击「启动题页.bat」。<br><strong>macOS / Linux：</strong>在终端运行 <code>sh ./启动题页.sh</code>。</p>
+        <p>启动需要 Python 3.8 或更新版本。请保持启动窗口开启，在浏览器中访问窗口显示的本机网址。</p>
+        <p>请先完整解压文件，不要直接双击 HTML。详细步骤见「使用前先看.txt」。</p>
+      </section>
+    </div>
+    <script>if (location.protocol === 'file:') document.getElementById('startup-title').textContent = '请从启动入口打开题页';</script>
     <div id="render-root" aria-hidden="true"></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.js"></script>

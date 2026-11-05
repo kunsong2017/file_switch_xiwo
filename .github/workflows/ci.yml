@@ -46,6 +46,7 @@ jobs:
           curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:5187/ > /dev/null
           npm run test:browser
           npm run test:ocr
+          npm run test:package
       - name: Upload static application
         uses: actions/upload-artifact@v4
         with:

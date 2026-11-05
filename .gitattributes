@@ -4,3 +4,5 @@
 *.png binary
 *.jpg binary
 *.wasm binary
+*.bat text eol=crlf
+*.sh text eol=lf

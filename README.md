@@ -25,9 +25,17 @@
 
 ## 启动
 
-需要 Node.js 20+、npm，以及 Python 3（静态网页服务）。
+完整交付包先解压，然后启动：
 
-交付包已带 `dist/`，直接运行 `python3 scripts/serve.py` 即可，不需要安装 Node.js。下面的完整步骤仅用于从源码重建。
+- **Windows**：安装一次 [Python 3](https://www.python.org/downloads/windows/)，然后双击 `启动题页.bat`。
+- **macOS / Linux**：运行 `sh ./启动题页.sh`，需要 Python 3.8 或更新版本。
+- 浏览器会自动打开；如果没有，请复制启动窗口中的网址，通常是 `http://127.0.0.1:5187/`。使用期间保持启动窗口开启。
+
+交付包带有 `dist/`，不需要安装 Node.js。不要在压缩软件内运行，也不要双击根目录或 `dist/` 内的 `index.html`；本地 `file://` 地址无法正常加载应用模块和 PDF / OCR 资源。误打开 HTML 时页面会显示启动指引。
+
+也可在解压目录手动启动：Windows 运行 `py -3 scripts/serve.py --open`，macOS / Linux 运行 `python3 scripts/serve.py --open`。
+
+GitHub 的「Download ZIP」是源码包，不包含生成的 `dist/`。下面的完整步骤仅用于从源码重建，需要 Node.js 22、npm 和 Python 3.8+：
 
 ```sh
 npm ci

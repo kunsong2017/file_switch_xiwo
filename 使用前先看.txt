@@ -1,0 +1,30 @@
+题页 · 试卷转 PPT / 希沃课件
+
+请先完整解压压缩包，再启动。不要在压缩软件内部运行。
+
+Windows：
+1. 电脑需要安装 Python 3.8 或更新版本，只需安装一次：
+   https://www.python.org/downloads/windows/
+2. 双击本文件旁边的「启动题页.bat」。
+3. 浏览器会自动打开题页，通常是 http://127.0.0.1:5187/ 。
+   如果没有自动打开，请复制启动窗口中显示的网址到浏览器。
+4. 使用期间保持启动窗口开启，结束后关闭窗口即可。
+
+macOS / Linux：
+在解压后的文件夹打开终端，运行：
+   sh ./启动题页.sh
+需要 Python 3.8 或更新版本。
+
+旧包或手动启动（在含 scripts 和 dist 文件夹的目录中）：
+Windows：py -3 scripts/serve.py --open
+macOS / Linux：python3 scripts/serve.py --open
+
+为什么双击 index.html 会空白？
+这是一个需要通过网页服务打开的应用。根目录 index.html 是源码入口；
+dist/index.html 是构建后的入口，也需要 HTTP 地址加载脚本、字体和识别引擎。
+双击 HTML 会使用 file:// 地址，浏览器会限制这些资源的加载。
+使用上面的启动入口后，浏览器通过本机 HTTP 地址打开，文件仍只在浏览器中处理。
+
+如果提示缺少 dist/index.html：
+你可能下载的是 GitHub 的源码 ZIP。源码包需先按 README 构建；
+已构建的完整交付包应包含 dist、scripts 和启动入口。

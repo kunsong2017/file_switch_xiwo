@@ -7,6 +7,11 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--output', type=Path, default=root.parent / '题页-试卷转PPT-交付包.zip')
 args = parser.parse_args()
+if not (root / 'dist/index.html').is_file():
+    raise SystemExit('缺少构建产物 dist/index.html，请先运行 npm run build 再打包。')
+for required in ['ocr/worker.min.js', 'ocr/lang/eng.traineddata.gz', 'ocr/lang/chi_sim.traineddata.gz']:
+    if not (root / 'dist' / required).is_file():
+        raise SystemExit(f'缺少离线资源 {required}，请准备资源并重新构建后打包。')
 target = args.output.resolve()
 temporary = target.with_suffix('.tmp.zip')
 excluded = {'node_modules', 'test-results', '.git', 'dist-next', 'dist-previous'}
