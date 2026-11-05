@@ -1,0 +1,61 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: npm ci
+      - name: Prepare local PDF and OCR assets
+        run: |
+          npm run assets
+          python3 scripts/download-languages.py
+      - name: Run unit tests and build
+        run: |
+          npm test
+          npm run build
+      - name: Install browser
+        run: |
+          npx playwright install --with-deps chromium
+          node --input-type=module -e "import {chromium} from '@playwright/test'; console.log('CHROME_PATH=' + chromium.executablePath())" >> "$GITHUB_ENV"
+      - name: Test browser workflow and local OCR
+        env:
+          EXAM_TEST_URL: http://127.0.0.1:5187
+        run: |
+          python3 scripts/serve.py --port 5187 > /tmp/tiye-ci-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:5187/ > /dev/null
+          npm run test:browser
+          npm run test:ocr
+      - name: Upload static application
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiye-static-site
+          path: dist/
+          retention-days: 7
+      - name: Upload browser results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-results
+          path: test-results/
+          retention-days: 7

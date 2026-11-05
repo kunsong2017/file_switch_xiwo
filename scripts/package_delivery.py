@@ -1,0 +1,27 @@
+"""Package the ready-to-serve static app and its source without local runtime data."""
+import argparse
+import zipfile
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser()
+parser.add_argument('--output', type=Path, default=root.parent / '题页-试卷转PPT-交付包.zip')
+args = parser.parse_args()
+target = args.output.resolve()
+temporary = target.with_suffix('.tmp.zip')
+excluded = {'node_modules', 'test-results', '.git', 'dist-next', 'dist-previous'}
+with zipfile.ZipFile(temporary, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+    for item in sorted(root.rglob('*')):
+        if not item.is_file() or item.resolve() in (target, temporary):
+            continue
+        rel = item.relative_to(root)
+        if any(part in excluded for part in rel.parts):
+            continue
+        if len(rel.parts) > 1 and rel.parts[0] == 'public' and rel.parts[1] in {'pdf', 'ocr', 'licenses'}:
+            continue
+        archive.write(item, Path('题页-试卷转PPT') / rel)
+with zipfile.ZipFile(temporary) as archive:
+    if archive.testzip() is not None:
+        raise RuntimeError('交付包完整性检查失败')
+temporary.replace(target)
+print(f'{target} ({target.stat().st_size:,} bytes)')

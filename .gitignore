@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-next/
+test-results/
+*.log
+.DS_Store
+public/pdf/
+public/ocr/
+public/licenses/
+__pycache__/
+*.pyc
