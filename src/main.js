@@ -96,7 +96,11 @@ function render() {
   const paperScroll = document.querySelector('.paper-scroll')?.scrollTop || 0;
   const listScroll = document.querySelector('.question-list')?.scrollTop || 0;
   app.innerHTML = `<div class="app-shell">${sidebar()}<main>${header()}${state.file ? workspace() : emptyState()}</main></div><input id="file-input" type="file" accept=".pdf,.docx,.doc" hidden/>${state.modal === 'settings' ? settingsModal() : state.modal === 'help' ? helpModal() : ''}${state.busy ? `<div class="busy-overlay" role="alert" aria-busy="true"><div class="busy-card"><span class="busy-spinner"></span><h3 id="progress-label">${esc(state.message)}</h3><p>文件在本机处理，请稍等片刻</p><div class="progress-track"><div id="progress-bar" style="width:${state.progress * 100}%"></div></div></div></div>` : ''}`;
-  app.querySelectorAll('a[href^="/examples/"]').forEach(link => {link.href = resourceURL(link.getAttribute('href'));});
+  app.querySelectorAll('a[href^="/examples/"]').forEach(link => {
+    const source = link.getAttribute('href');
+    link.href = resourceURL(source);
+    link.download = source.split('/').pop();
+  });
   createIcons({icons: iconSet});
   const paper = document.querySelector('.paper-scroll');
   if (paper) paper.scrollTop = paperScroll;

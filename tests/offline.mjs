@@ -57,6 +57,16 @@ try {
   await page.goto(url);
   await page.getByRole('heading', {name: '一份试卷，一题一页。'}).waitFor();
   await page.screenshot({path: path.join(root, 'test-results/offline-home.png')});
+  await page.locator('[data-action="help"]').first().click();
+  for (const [index, extension] of ['pdf', 'docx'].entries()) {
+    const pending = page.waitForEvent('download');
+    await page.locator('.help-modal a').nth(index).click();
+    const file = await pending;
+    assert.equal(file.suggestedFilename(), `数学示例试卷.${extension}`, 'example keeps its file extension');
+    assert.deepEqual(await readFile(await file.path()), await readFile(path.join(root, `public/examples/数学示例试卷.${extension}`)));
+  }
+  await page.locator('[data-action="close"]').first().click();
+  console.log('PASS file:// PDF/DOCX example downloads retain names and original contents');
   await page.locator('[data-action="demo"]').click();
   await page.locator('.workspace').waitFor({timeout: 45000});
   await settle();
