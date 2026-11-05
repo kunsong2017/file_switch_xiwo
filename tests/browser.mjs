@@ -3,6 +3,7 @@ import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import JSZip from 'jszip';
+import {validateENBX} from './enbx-validation.mjs';
 const baseURL = process.env.EXAM_TEST_URL || 'http://127.0.0.1:5187';
 const results = path.resolve('test-results');
 await mkdir(results, {recursive:true});
@@ -30,10 +31,16 @@ async function download(name, expected, format = 'pptx') {
   await page.locator('[data-action="export"]').click();
   const file = await pending;
   if (format === 'seewo') assert.ok(file.suggestedFilename().endsWith('-希沃导入版.pptx'),'Seewo download has an honest PPTX extension');
+  if (format === 'enbx') assert.ok(file.suggestedFilename().endsWith('.enbx'),'native download extension');
   const target = path.join(results,name);
   await file.saveAs(target);
   await settle();
   const zip = await JSZip.loadAsync(await readFile(target));
+  if(format === 'enbx') {
+    await validateENBX(zip,expected);
+    console.log(`PASS ${name}: ${expected} native slides, ordered IDs, valid XML and embedded PNG references`);
+    return zip;
+  }
   const slides = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n));
   assert.equal(slides.length, expected, `${name}: slide count`);
   assert.ok(Object.keys(zip.files).some(n => /^ppt\/media\/image/.test(n)), 'PPT contains actual question images');
@@ -70,6 +77,7 @@ try {
   await writeFile(path.join(results,'sample-page.png'),Buffer.from(dataURL.split(',')[1],'base64'));
   await download('pdf-six-questions.pptx',6);
   await download('seewo-pdf-six-questions.pptx',6,'seewo');
+  await download('native-pdf-six-questions.enbx',6,'enbx');
   await page.locator('[data-action="split"]').click();
   assert.equal(await count(),7);
   await page.locator('[data-action="undo"]').click();
@@ -108,6 +116,7 @@ try {
   await page.screenshot({path:path.join(results,'word-formula.png'),fullPage:true});
   await download('word-six-questions.pptx',6);
   await download('seewo-word-six-questions.pptx',6,'seewo');
+  await download('native-word-six-questions.enbx',6,'enbx');
   console.log('PASS DOCX import with embedded image and OMML formula');
 
   await upload('tests/fixtures/automatic-numbering.docx');

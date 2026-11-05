@@ -6,6 +6,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
+import {validateENBX} from './enbx-validation.mjs';
 
 const root = fileURLToPath(new URL('..',import.meta.url));
 const temporary = await mkdtemp(path.join(tmpdir(),'tiye-package-'));
@@ -57,6 +58,14 @@ try {
   const pptx = await JSZip.loadAsync(await readFile(await download.path()));
   assert.equal(pptx.file(/^ppt\/slides\/slide\d+\.xml$/).length,6);
   console.log('PASS extracted package starts outside its directory, including Unicode/spaces, and exports 6 slides');
+  await page.locator('.busy-overlay').waitFor({state:'hidden'});
+  await page.locator('[data-action="settings"]').first().click();
+  await page.locator('[data-action="format"][data-value="enbx"]').click();
+  const nativePending=page.waitForEvent('download');
+  await page.locator('[data-action="export"]').click();
+  const native=await nativePending;
+  await validateENBX(await JSZip.loadAsync(await readFile(await native.path())),6,{width:1600,height:900});
+  console.log('PASS extracted offline package exports actual native ENBX without external services');
   const port = new URL(server.url).port;
   let second;
   try {

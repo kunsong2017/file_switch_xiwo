@@ -3,7 +3,7 @@ import pptxgen from 'pptxgenjs';
 
 // Render an entire page to an image so Seewo import does not depend on Office
 // fonts, MathML or special drawing objects. Users can add annotations in Seewo.
-function renderPage(q, pages, options, index, total) {
+export function renderPage(q, pages, options, index, total) {
   const canvas = document.createElement('canvas');
   canvas.width = options.ratio === '4:3' ? 1200 : 1600;
   canvas.height = 900;

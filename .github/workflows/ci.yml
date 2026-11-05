@@ -45,6 +45,7 @@ jobs:
           trap 'kill "$server_pid"' EXIT
           curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:5187/ > /dev/null
           npm run test:browser
+          npm run test:enbx
           npm run test:ocr
           npm run test:package
       - name: Upload static application
