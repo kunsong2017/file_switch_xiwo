@@ -14,13 +14,15 @@ for required in ['ocr/worker.min.js', 'ocr/lang/eng.traineddata.gz', 'ocr/lang/c
         raise SystemExit(f'缺少离线资源 {required}，请准备资源并重新构建后打包。')
 target = args.output.resolve()
 temporary = target.with_suffix('.tmp.zip')
-excluded = {'node_modules', 'test-results', '.git', 'dist-next', 'dist-previous', 'offline'}
+excluded = {'node_modules', 'test-results', '.git', 'dist-next', 'dist-previous'}
 with zipfile.ZipFile(temporary, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
     for item in sorted(root.rglob('*')):
         if not item.is_file() or item.resolve() in (target, temporary):
             continue
         rel = item.relative_to(root)
         if any(part in excluded for part in rel.parts):
+            continue
+        if rel.parts[0] == 'offline' and item.suffix == '.zip':
             continue
         if len(rel.parts) > 1 and rel.parts[0] == 'public' and rel.parts[1] in {'pdf', 'ocr', 'licenses'}:
             continue

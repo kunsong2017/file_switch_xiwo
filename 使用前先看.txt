@@ -3,6 +3,7 @@
 Windows 使用方法：
 1. 完整解压压缩包，不要在压缩软件里直接运行。
 2. 双击同一文件夹中的 index.html，用 Microsoft Edge 或 Google Chrome 打开。
+   GitHub 下载包的根目录 index.html 会自动打开 offline/index.html；也可直接打开后者。
    如果默认打开的是其他程序，右键 index.html → 打开方式 → Microsoft Edge。
 3. 选择 PDF 或 Word（.docx）试卷，检查分题结果后导出。
 
@@ -20,7 +21,7 @@ PowerPoint：标准 .pptx，题干是图片，标题可编辑。
 旧版 .doc 请先用 Word / WPS 另存为 .docx 或 PDF。
 文件在浏览器本地处理，不上传试卷。刷新或关闭页面会清空当前工作。
 
-如果双击后仍看到要求 Python 的旧提示，请重新解压「免安装离线版」，
-不要使用旧包或 GitHub 源码包中的 index.html。
-GitHub 的 Download ZIP 是源码，供开发者构建；免安装包才含可直接运行的 HTML。
+GitHub 仓库主页 → Code → Download ZIP，完整解压后即可使用。
+仓库同时保存源码 src/ 和可运行版本 offline/，下载后不需要自己构建。
+如果仍看到要求 Python 的旧提示，请重新下载 main 分支并解压到新文件夹。
 licenses 文件夹保存第三方授权文本，请随程序一起保留。

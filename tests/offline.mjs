@@ -13,9 +13,11 @@ const temporary = await mkdtemp(path.join(tmpdir(), 'tiye-offline-'));
 const extracted = path.join(temporary, '中文解压目录 with spaces');
 let browser;
 try {
-  const archive = path.join(temporary, '离线包.zip');
-  const pack = spawnSync(process.execPath, ['scripts/package-offline.mjs', '--output', archive], {cwd: root, encoding: 'utf8'});
-  assert.equal(pack.status, 0, pack.stdout + pack.stderr);
+  const archive = process.env.EXAM_TEST_OFFLINE_ARCHIVE || path.join(temporary, '离线包.zip');
+  if (!process.env.EXAM_TEST_OFFLINE_ARCHIVE) {
+    const pack = spawnSync(process.execPath, ['scripts/package-offline.mjs', '--output', archive], {cwd: root, encoding: 'utf8'});
+    assert.equal(pack.status, 0, pack.stdout + pack.stderr);
+  }
   const zip = await JSZip.loadAsync(await readFile(archive), {checkCRC32: true});
   for (const [name, entry] of Object.entries(zip.files)) {
     if (entry.dir) continue;
@@ -23,7 +25,9 @@ try {
     await mkdir(path.dirname(target), {recursive: true});
     await writeFile(target, await entry.async('nodebuffer'));
   }
-  const html = path.join(extracted, '题页-试卷转PPT/index.html');
+  const entries = Object.keys(zip.files).filter(name => /^[^/]+\/index\.html$/.test(name));
+  assert.equal(entries.length, 1, 'archive has one root HTML entry');
+  const html = path.join(extracted, entries[0]);
   const url = pathToFileURL(html).href;
   browser = await chromium.launch({executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox', '--disable-dev-shm-usage']});
   const context = await browser.newContext({acceptDownloads: true, viewport: {width: 1440, height: 1050}, offline: true});

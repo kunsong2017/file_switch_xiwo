@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
+      - name: Check committed offline delivery matches source
+        run: npm run check:offline
       - name: Install dependencies
         run: npm ci
       - name: Prepare local PDF and OCR assets

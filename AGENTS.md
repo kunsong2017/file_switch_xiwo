@@ -10,6 +10,7 @@
 - 单元测试：`npm test`；启动静态服务后运行 `npm run test:browser` 和 `npm run test:ocr`。
 - 浏览器测试默认使用 `/usr/bin/google-chrome`，可通过 `CHROME_PATH` 指定其他 Chromium。`EXAM_TEST_URL` 指定测试服务地址。
 - `public/pdf/`、`public/ocr/`、`public/licenses/` 从固定版本依赖生成，不提交；`dist/`、`node_modules/`、`test-results/` 也不提交。
+- 用户要求仅凭 GitHub 网址即可下载使用：`offline/` 的 HTML、说明、授权及 `build.json` 必须提交到仓库，根目录 HTML 在 file:// 下自动转到该入口。源码 / 依赖 / 构建脚本改变后重建 `npm run build:offline`，用 `npm run check:offline` 核对后连同产物提交；不能只更新源码。独立 ZIP 默认输出到工程内 `offline/`，ZIP 文件不提交。
 - PDF / DOCX 样例与测试夹具为原创，应保留以支持回归测试。
 - 用户要求免安装离线包：`npm run build:offline` → `npm run package:offline`，解压后双击 `index.html`，不需要 Python / Node / 本地服务。所有运行资源内嵌，PDF 和 OCR 使用 Blob Worker。改动后运行 `npm run test:offline`，用真实 ZIP 解压后的 file:// 入口、断网模式验证。原 `scripts/package_delivery.py` / 启动脚本仅保留作旧版服务包兼容，并用 `npm run test:package` 回归。
 - 用户试卷只在浏览器本地处理，不新增试卷上传或外部 OCR 请求。

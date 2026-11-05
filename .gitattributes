@@ -9,3 +9,6 @@
 *.sh text eol=lf
 src/enbx-metadata.xml text eol=crlf
 third_party/OpenEnow.JS/openenow.js -whitespace
+offline/** -text linguist-generated=true
+offline/index.html -diff
+offline/licenses/** -whitespace

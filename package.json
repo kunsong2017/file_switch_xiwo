@@ -7,6 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "build:offline": "node scripts/build-offline.mjs",
+    "check:offline": "node scripts/check-offline.mjs",
     "package:offline": "node scripts/package-offline.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "assets": "node scripts/prepare-assets.mjs",

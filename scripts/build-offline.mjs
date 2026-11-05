@@ -2,13 +2,14 @@ import {build, transformWithEsbuild} from 'vite';
 import {readFile, writeFile, readdir, mkdir, cp} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {writeOfflineManifest} from './check-offline.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.join(root, 'offline');
 const assets = {};
 async function embed(name, file) {assets[name] = (await readFile(path.join(root, file))).toString('base64');}
 for (const directory of ['pdf/cmaps', 'pdf/fonts', 'examples']) {
-  for (const name of await readdir(path.join(root, 'public', directory))) {
+  for (const name of (await readdir(path.join(root, 'public', directory))).sort()) {
     if (directory === 'examples' || /\.(bcmap|pfb|ttf)$/.test(name)) await embed(`/${directory}/${name}`, `public/${directory}/${name}`);
   }
 }
@@ -50,4 +51,5 @@ for (const directory of ['cmaps', 'fonts']) {
   }
 }
 await cp(path.join(root, '使用前先看.txt'), path.join(output, '使用前先看.txt'));
+await writeOfflineManifest(root);
 console.log(`可双击的离线 HTML：${path.join(output, 'index.html')} (${(Buffer.byteLength(html) / 1024 / 1024).toFixed(1)} MB)`);

@@ -66,3 +66,11 @@
 - 普通网页构建、8 项单元测试、网页浏览器 / OCR 和旧版服务包启动回归通过。CI 增加免安装版构建、真实解压测试与产物上传；远端 CI 执行结果未在当前环境核验。
 
 验证环境为 Linux 上的 Chrome 102，使用默认安全设置和本地文件路径；没有 Windows 实机或真实希沃白板客户端。Windows / Edge 实机打开及希沃客户端兼容性仍待验收，ENBX 保留试用标记。
+
+## GitHub 下载交付路径
+
+此前只将离线源码与构建脚本推送到 GitHub，`offline/` 被忽略，构建 ZIP 位于工程外；因此只拿仓库网址的用户仍不能直接使用。现在将 `offline/index.html`、使用说明、授权文件和 `build.json` 随仓库提交。GitHub 的 Code → Download ZIP 包含源码与可运行离线目录；解压后根目录 HTML 自动跳转到 `offline/index.html`。独立免安装 ZIP 的默认输出也改为工程内 `offline/`。
+
+`npm run check:offline` 在 CI 构建前核对当前源码 / 依赖锁 / 构建脚本 / 原创示例与离线清单，以及 HTML、说明、授权文件的 SHA256，避免重新构建掩盖随仓库提交的旧产物。单元测试验证源码过期或 HTML 被修改会拒绝，同时允许 Windows 源码 CRLF 换行。
+
+`npm run test:offline` 支持 `EXAM_TEST_OFFLINE_ARCHIVE`，可对下载的实际 GitHub ZIP 复用完整的解压、根入口、PDF / Word、OCR 和三种导出检查；测试仍使用断网浏览器，不依赖外部启动服务。`npm run test:package` 检查完整工程包根目录与 dist 入口在 file:// 下均自动转入离线版。

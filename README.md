@@ -6,6 +6,14 @@
 
 在浏览器中打开 PDF / Word 试卷，按题目分割，每道题导出为一页。支持 PowerPoint / WPS `.pptx`、希沃白板导入版 `.pptx` 和希沃原生 `.enbx`（试用）。试卷与 OCR 均在浏览器本地处理，无账号、无文档上传、无模型 API 密钥。
 
+## 从 GitHub 下载后直接使用
+
+1. 点击 [下载 main 分支 ZIP](https://github.com/kunsong2017/file_switch_xiwo/archive/refs/heads/main.zip)，或在仓库首页选择绿色 **Code → Download ZIP**。
+2. 完整解压，进入 `file_switch_xiwo-main` 文件夹。
+3. 双击根目录 `index.html`，会自动打开 `offline/index.html`；也可以直接进入 `offline` 文件夹双击其中的 `index.html`。使用 Edge / Chrome，无需安装 Python、Node.js，也无需构建或启动服务，断网可用。
+
+`src/` 是源码，**`offline/index.html` 是由同一工程构建并随仓库提交的可运行版本**。`offline/licenses/` 保存授权文本，`offline/build.json` 记录源码及产物的 SHA256。更新运行代码时需同时重建并提交 `offline/`，CI 会在构建前检查两者是否同步。
+
 ## 使用
 
 1. 上传 PDF 或 Word `.docx`；也可以拖入文件，或点「试用示例」。
@@ -37,7 +45,7 @@
 
 发行包仅含可直接运行的 `index.html`、使用说明及第三方授权文本。不要在压缩软件内部打开，先解压。macOS / Linux 同样可用 Chrome 打开离线 HTML。
 
-GitHub 的「Download ZIP」是源码包，根目录 `index.html` 是开发入口，并非免安装版。开发者可按下方步骤构建，生成 `offline/index.html` 和免安装 ZIP：
+GitHub 的「Download ZIP」已包含 `offline/`，可直接按上面的步骤使用。只有修改源码、需要重建离线版时，才需执行以下开发步骤：
 
 以下为开发构建环境，需要 Node.js 22、npm 和 Python 3.8+；使用者电脑不需要这些环境：
 
@@ -49,6 +57,8 @@ npm run build:offline
 npm run package:offline
 ```
 
+独立免安装包输出到工程内的 `offline/题页-试卷转PPT-免安装离线版.zip`。ZIP 是可选的重新打包产物，不纳入 Git；GitHub 下载 ZIP 中已经包含可运行 HTML。提交前运行 `npm run check:offline` 检查源码与产物是否同步。
+
 也可生成普通网页服务版本：
 
 ```sh
@@ -56,7 +66,7 @@ npm run build
 python3 scripts/serve.py
 ```
 
-浏览器打开 `http://localhost:5187`。同一网络访问可用 `python3 scripts/serve.py --bind 0.0.0.0`，然后使用服务器实际 IP。`dist/` 是普通静态站点，需 HTTP / HTTPS；可双击的版本是 `offline/index.html`。旧版 `启动题页.bat` / `.sh` 仅用于网页服务版本，免安装版不使用它们。
+浏览器打开 `http://localhost:5187`。同一网络访问可用 `python3 scripts/serve.py --bind 0.0.0.0`，然后使用服务器实际 IP。`dist/` 是普通静态站点，部署时需 HTTP / HTTPS；仓库下载后直接打开 HTML 会转到 `offline/index.html`。旧版 `启动题页.bat` / `.sh` 仅用于网页服务版本，免安装版不使用它们。
 
 开发调试：`npm run dev -- --port 5187`。首次准备依赖和 OCR 语言包需要联网，构建后核心转换不依赖外部 CDN。
 
@@ -100,4 +110,4 @@ npm run test:offline
 
 GitHub Actions 配置位于 `.github/workflows/ci.yml`，包含干净安装、资源准备、单元测试、生产构建、浏览器导出及本地 OCR 测试，并上传静态站点产物。源码提交与网页发布相互独立。
 
-本地网页回归：启动 `python3 scripts/serve.py` 后运行 `npm run test:browser` 和 `npm run test:ocr`。免安装版构建后运行 `npm run test:offline`，测试真实 ZIP 解压后的 file:// 入口，覆盖 PDF、Word、三种导出及扫描 OCR；测试浏览器设为断网，检测 HTTP 请求。执行 `npm run package:offline` 生成免安装 ZIP。旧版完整工程服务包仍可用 `python3 scripts/package_delivery.py` 生成。
+本地网页回归：启动 `python3 scripts/serve.py` 后运行 `npm run test:browser` 和 `npm run test:ocr`。运行 `npm run check:offline` 检查随仓库交付的离线版本；`npm run test:offline` 测试真实 ZIP 解压后的 file:// 入口，覆盖 PDF、Word、三种导出及扫描 OCR，测试浏览器设为断网并检测 HTTP 请求。执行 `npm run package:offline` 生成工程内的独立免安装 ZIP。旧版完整工程服务包仍可用 `python3 scripts/package_delivery.py` 生成。

@@ -36,7 +36,7 @@ try {
   const pack = spawnSync(python,[path.join(root,'scripts/package_delivery.py'),'--output',archive],{cwd:root,encoding:'utf8'});
   assert.equal(pack.status,0,pack.stdout+pack.stderr);
   const zip = await JSZip.loadAsync(await readFile(archive));
-  for (const file of ['启动题页.bat','启动题页.sh','使用前先看.txt','dist/index.html','scripts/serve.py']) assert.ok(zip.file('题页-试卷转PPT/'+file),'packaged '+file);
+  for (const file of ['启动题页.bat','启动题页.sh','使用前先看.txt','dist/index.html','scripts/serve.py','offline/index.html','offline/build.json']) assert.ok(zip.file('题页-试卷转PPT/'+file),'packaged '+file);
   assert.ok(!(await zip.file('题页-试卷转PPT/启动题页.bat').async('string')).match(/(?<!\r)\n/),'Windows launcher has CRLF line endings');
   await mkdir(extracted,{recursive:true});
   const unpack = spawnSync(python,['-m','zipfile','-e',archive,extracted],{encoding:'utf8'});
@@ -79,12 +79,12 @@ try {
   const direct = await browser.newPage();
   for (const html of ['index.html','dist/index.html']) {
     await direct.goto(pathToFileURL(path.join(extracted,'题页-试卷转PPT',html)).href);
-    await direct.getByRole('heading',{name:'请从启动入口打开题页'}).waitFor();
-    await direct.getByText('启动需要 Python 3.8 或更新版本。',{exact:false}).waitFor();
+    await direct.getByRole('heading',{name:'一份试卷，一题一页。'}).waitFor();
+    assert.ok(direct.url().endsWith('/offline/index.html'),'HTML entry redirects to the committed offline app');
   }
   await mkdir(path.join(root,'test-results'),{recursive:true});
-  await direct.screenshot({path:path.join(root,'test-results/local-file-startup-guide.png'),fullPage:true});
-  console.log('PASS direct file opening shows startup instructions; occupied port and browser auto-open work');
+  await direct.screenshot({path:path.join(root,'test-results/local-file-entry.png'),fullPage:true});
+  console.log('PASS direct file opening redirects to offline HTML; occupied port and browser auto-open work');
 } finally {
   await browser?.close();
   server?.process.kill();
