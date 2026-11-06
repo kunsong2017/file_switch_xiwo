@@ -87,6 +87,16 @@ try {
   await page.locator('.question-card').nth(4).click();
   await page.screenshot({path: path.join(root, 'test-results/offline-word-formula.png'), fullPage: true});
   console.log('PASS file:// PDF and DOCX uploads, Word formula and native ENBX');
+  await upload('tests/初三数学期中综合复习2.pdf');
+  assert.equal(await count(),27,'supplied text PDF has questions 1–27');
+  await download('enbx',27,'offline-real-exam2.enbx');
+  await upload('tests/初三数学复习卷 6.pdf');
+  assert.equal(await count(),0,'supplied scanned PDF requires OCR');
+  await page.locator('[data-action="ocr"]').click();
+  await settle();
+  assert.equal(await count(),26,'supplied four-page scan has questions 1–26 after offline OCR');
+  await download('enbx',26,'offline-real-exam6.enbx');
+  console.log('PASS file:// both supplied exams: 27/26 questions and native ENBX exports');
   await upload('tests/fixtures/scanned-exam.pdf');
   assert.equal(await count(), 0, 'scanned file initially has no text');
   await page.locator('[data-action="ocr"]').click();

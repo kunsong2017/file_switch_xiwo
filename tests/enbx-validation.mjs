@@ -39,8 +39,6 @@ export async function validateENBX(zip,expected,{width,height}={}) {
   for(let i=0;i<files.length;i++) {
     const slide=await parse(files[i].name);
     assert.equal(text(slide,'Id'),ids[i],'Board order matches numeric slide order');
-    if(width) assert.equal(Number(text(slide,'Width')),width);
-    if(height) assert.equal(Number(text(slide,'Height')),height);
     const pictures=slide.getElementsByTagName('Picture');
     assert.equal(pictures.length,1);
     const picture=pictures[0];
@@ -48,11 +46,18 @@ export async function validateENBX(zip,expected,{width,height}={}) {
     const bytes=resources.get(text(picture,'Source').slice(5)).bytes;
     assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a','picture is actual PNG');
     const w=bytes.readUInt32BE(16),h=bytes.readUInt32BE(20);
-    assert.equal(text(picture,'PictureSize'),`${h},${w}`);
-    assert.equal(text(picture,'Rectangle'),`0,0,${w},${h}`);
+    if(width) assert.equal(w,width);
+    if(height) assert.equal(h,height);
+    assert.equal(text(picture,'PictureSize'),`${w},${h}`);
+    assert.equal(text(picture,'Rectangle'),`0,0,${h},${w}`);
     assert.equal(Number(text(picture,'FileSize')),bytes.length);
-    assert.equal(Number(text(picture,'Width')),w);
-    assert.equal(Number(text(picture,'Height')),h);
+    const slideWidth=Number(text(slide,'Width')),slideHeight=Number(text(slide,'Height'));
+    assert.equal(slideHeight,720,'native logical slide height');
+    assert.ok(Math.abs(slideWidth/slideHeight-w/h)<1e-10,'slide and image aspect ratios agree');
+    assert.equal(Number(text(picture,'Width')),slideWidth,'picture covers full slide width');
+    assert.equal(Number(text(picture,'Height')),slideHeight,'picture covers full slide height');
+    assert.equal(Number(text(picture,'X')),0);
+    assert.equal(Number(text(picture,'Y')),0);
     checkReferences(slide);
   }
   return {resources,document:await parse('Document.xml')};

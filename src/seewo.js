@@ -3,29 +3,31 @@ import pptxgen from 'pptxgenjs';
 
 // Render an entire page to an image so Seewo import does not depend on Office
 // fonts, MathML or special drawing objects. Users can add annotations in Seewo.
-export function renderPage(q, pages, options, index, total) {
+export function renderPage(q, pages, options, index, total, resolution = 1) {
   const canvas = document.createElement('canvas');
-  canvas.width = options.ratio === '4:3' ? 1200 : 1600;
-  canvas.height = 900;
+  const pageWidth=options.ratio === '4:3' ? 1200 : 1600, pageHeight=900;
+  canvas.width = pageWidth*resolution;
+  canvas.height = pageHeight*resolution;
   const theme = themes[options.theme];
   const ctx = canvas.getContext('2d');
+  ctx.scale(resolution,resolution);
   ctx.fillStyle = `#${theme.background}`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, pageWidth, pageHeight);
   ctx.textBaseline = 'top';
   const factor = 120;
   if (options.headings) {
     ctx.font = '600 30px "Microsoft YaHei", "PingFang SC", sans-serif';
     ctx.textBaseline = 'top';
     ctx.fillStyle = `#${theme.ink}`;
-    ctx.fillText(q.title, 60, 34, canvas.width - 120);
+    ctx.fillText(q.title, 60, 34, pageWidth - 120);
     ctx.strokeStyle = `#${theme.accent}`;
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(60,102); ctx.lineTo(canvas.width-60,102); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(60,102); ctx.lineTo(pageWidth-60,102); ctx.stroke();
   }
   const question = composeQuestion(q, pages);
   const top = options.headings ? 1.08 * factor : .45 * factor;
-  const availableHeight = canvas.height - top - (options.blankSpace ? 2 : .5) * factor;
-  const availableWidth = canvas.width - 120;
+  const availableHeight = pageHeight - top - (options.blankSpace ? 2 : .5) * factor;
+  const availableWidth = pageWidth - 120;
   const scale = Math.min(availableWidth / question.width, availableHeight / question.height);
   const width = question.width * scale, height = question.height * scale;
   ctx.drawImage(question,60+(availableWidth-width)/2,top,width,height);
@@ -37,8 +39,8 @@ export function renderPage(q, pages, options, index, total) {
     ctx.lineWidth = .5;
     ctx.globalAlpha = .35;
     for (let i = 0; i < 3; i++) {
-      const y = canvas.height - 1.15 * factor + i * .32 * factor;
-      ctx.beginPath();ctx.moveTo(66,y);ctx.lineTo(canvas.width-66,y);ctx.stroke();
+      const y = pageHeight - 1.15 * factor + i * .32 * factor;
+      ctx.beginPath();ctx.moveTo(66,y);ctx.lineTo(pageWidth-66,y);ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }
@@ -46,7 +48,8 @@ export function renderPage(q, pages, options, index, total) {
   ctx.fillStyle = `#${theme.muted}`;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
-  ctx.fillText(`${index+1} / ${total}`,canvas.width-60,canvas.height-15);
+  ctx.fillText(`${index+1} / ${total}`,pageWidth-60,pageHeight-15);
+  question.width=0;
   return canvas;
 }
 

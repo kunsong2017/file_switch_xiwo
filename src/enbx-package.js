@@ -38,8 +38,11 @@ export async function buildENBX({title,slides,background,thumbnail,metadata}) {
     const resource=addPNG(png);
     const slideID=id();
     slideIDs.push(slideID);
-    const picture=`<Picture>${node('Source',`id://${resource}`)}${node('PictureName',`question-${i+1}.png`)}<Alpha>1</Alpha><DisplayRegion>${node('Rectangle',`0,0,${width},${height}`)}</DisplayRegion><Style><StyleType>None</StyleType><PicturePresetStyle>None</PicturePresetStyle></Style><MetaData>${node('PictureSize',`${height},${width}`)}${node('FileSize',png.byteLength)}</MetaData>${node('Id',guid())}<X>0</X><Y>0</Y>${node('Width',width)}${node('Height',height)}${properties}</Picture>`;
-    zip.file(`Slides/Slide_${i}.xml`,xml(`<Slide>${node('Id',slideID)}${node('Width',width)}${node('Height',height)}<Background>${imageBrush(backgroundID)}</Background><Elements>${picture}</Elements><Duration>5000000</Duration><ThemeForSlide><ThemeId>-12</ThemeId></ThemeForSlide></Slide>`));
+    // EasiNote uses width,height for PNG metadata but top,left,height,width for
+    // DisplayRegion. Its 720-unit slide coordinates are separate from pixels.
+    const slideHeight=720,slideWidth=width/height*slideHeight;
+    const picture=`<Picture>${node('Source',`id://${resource}`)}${node('PictureName',`question-${i+1}.png`)}<Alpha>1</Alpha><DisplayRegion>${node('Rectangle',`0,0,${height},${width}`)}</DisplayRegion><Style><StyleType>None</StyleType><PicturePresetStyle>None</PicturePresetStyle></Style><MetaData>${node('PictureSize',`${width},${height}`)}${node('FileSize',png.byteLength)}</MetaData>${node('Id',guid())}<X>0</X><Y>0</Y>${node('Width',slideWidth)}${node('Height',slideHeight)}${properties}</Picture>`;
+    zip.file(`Slides/Slide_${i}.xml`,xml(`<Slide>${node('Id',slideID)}${node('Width',slideWidth)}${node('Height',slideHeight)}<Background>${imageBrush(backgroundID)}</Background><Elements>${picture}</Elements><Duration>5000000</Duration><ThemeForSlide><ThemeId>-12</ThemeId></ThemeForSlide></Slide>`));
   }
   const now=new Date();
   const stamp=`${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;

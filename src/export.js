@@ -1,14 +1,47 @@
 import pptxgen from 'pptxgenjs';
+import {pageLayout} from './layout.js';
+
+function cropPart(crop,pages) {
+  const page=pages[crop.page], sx=Math.floor(page.width*crop.x),sy=Math.floor(page.height*crop.y);
+  const sw=Math.max(1,Math.min(page.width-sx,Math.ceil(page.width*(crop.x+crop.w))-sx));
+  const sh=Math.max(1,Math.min(page.height-sy,Math.ceil(page.height*(crop.y+crop.h))-sy));
+  const canvas=document.createElement('canvas');canvas.width=sw;canvas.height=sh;
+  const context=canvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,sw,sh);
+  context.save();
+  if(crop.clip) {
+    context.beginPath();
+    crop.clip.forEach((p,i)=>context[i?'lineTo':'moveTo'](p.x*page.width-sx,p.y*page.height-sy));
+    context.closePath();context.clip();
+  }
+  context.drawImage(page.canvas,sx,sy,sw,sh,0,0,sw,sh);
+  context.restore();
+  for(const rect of [...pageLayout(page).exclusions,...(crop.exclusions || [])]) {
+    context.fillRect(Math.floor(rect.x*page.width)-sx,Math.floor(rect.y*page.height)-sy,Math.ceil(rect.w*page.width)+1,Math.ceil(rect.h*page.height)+1);
+  }
+  for(const rect of crop.protections || []) {
+    const x=Math.max(0,Math.floor(rect.x*page.width)-1),y=Math.max(0,Math.floor(rect.y*page.height)-1);
+    const w=Math.min(page.width-x,Math.ceil((rect.x+rect.w)*page.width)+1-x),h=Math.min(page.height-y,Math.ceil((rect.y+rect.h)*page.height)+1-y);
+    if(w>0 && h>0) context.drawImage(page.canvas,x,y,w,h,x-sx,y-sy,w,h);
+  }
+  const pixels=context.getImageData(0,0,sw,sh).data;
+  let minX=sw,minY=sh,maxX=-1,maxY=-1;
+  for(let y=0;y<sh;y+=2) for(let x=0;x<sw;x+=2) {
+    const at=(y*sw+x)*4;
+    if(Math.min(pixels[at],pixels[at+1],pixels[at+2])<242) {minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+  }
+  if(maxX<0) return null;
+  const x=Math.max(0,minX-8),y=Math.max(0,minY-8),w=Math.min(sw,maxX+10)-x,h=Math.min(sh,maxY+10)-y;
+  return {canvas,x,y,w,h,logicalWidth:w*1800/page.width,logicalHeight:h*1800/page.width};
+}
 
 export function composeQuestion(question, pages, maxWidth = 1800) {
-  const parts = question.segments.map(crop => {
-    const p = pages[crop.page];
-    return {p, crop, sw: Math.max(1, Math.round(p.width * crop.w)), sh: Math.max(1, Math.round(p.height * crop.h))};
-  });
-  const width = Math.min(maxWidth, Math.max(...parts.map(p => p.sw)));
-  const heights = parts.map(p => p.sh * width / p.sw);
+  const parts = question.segments.map(crop=>cropPart(crop,pages)).filter(Boolean);
+  const naturalWidth=Math.max(1,...parts.map(p=>p.logicalWidth));
+  const factor=Math.min(1,maxWidth/naturalWidth);
+  const width = naturalWidth*factor;
+  const heights = parts.map(p => p.logicalHeight*factor);
   const gap = parts.length > 1 ? 20 : 0;
-  const totalHeight = Math.ceil(heights.reduce((a, b) => a + b, 0) + gap * (parts.length - 1));
+  const totalHeight = Math.max(1,Math.ceil(heights.reduce((a, b) => a + b, 0) + gap * Math.max(0,parts.length - 1)));
   // Bound canvas memory even for questions spanning many pages.
   const scale = Math.min(1, 14000 / totalHeight);
   const canvas = document.createElement('canvas');
@@ -19,7 +52,9 @@ export function composeQuestion(question, pages, maxWidth = 1800) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   let y = 0;
   parts.forEach((part, i) => {
-    ctx.drawImage(part.p.canvas, Math.round(part.crop.x * part.p.width), Math.round(part.crop.y * part.p.height), part.sw, part.sh, 0, y * scale, canvas.width, heights[i] * scale);
+    const partWidth=part.logicalWidth*factor*scale;
+    ctx.drawImage(part.canvas,part.x,part.y,part.w,part.h,(canvas.width-partWidth)/2,y*scale,partWidth,heights[i]*scale);
+    part.canvas.width=0;
     y += heights[i] + gap;
   });
   return canvas;

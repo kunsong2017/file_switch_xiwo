@@ -26,6 +26,22 @@ test('two columns are traversed left then right', () => {
 test('empty scan does not pretend to have recognized questions', () => {
   assert.deepEqual(segmentPages([{lines:[]}]), []);
 });
+test('page counters never become part of the final question crop', () => {
+  const result = segmentPages([{lines:[line('1. 计算', .2), line('答：15', .35), line('第 1 页，共 2 页', .91)], bottoms:{1:[.94]}}]);
+  assert.equal(result.length, 1);
+  assert.ok(result[0].segments[0].y + result[0].segments[0].h < .91);
+});
+test('figure captions are not additional questions', () => {
+  const result = segmentPages([{lines:[line('1. 计算', .2), line('2. 如图求面积', .5), line('第2题图', .7)]}]);
+  assert.equal(result.length, 2);
+});
+test('an image-only continuation page is retained with its question', () => {
+  const result = segmentPages([
+    {lines:[line('1. 下页图中求解', .7)]},
+    {lines:[], graphics:[{x:.2,y:.1,w:.4,h:.3}], bottoms:{1:[.4]}}
+  ]);
+  assert.ok(result[0].segments.some(segment => segment.page === 1));
+});
 test('preserves graphics below the last text line and continuous Word slice edges', () => {
   const graphics = segmentPages([{lines:[line('1. 看图回答',.2),line('题干结束',.3)],bottoms:{1:[.8]}}]);
   assert.ok(graphics[0].segments[0].y + graphics[0].segments[0].h >= .8);

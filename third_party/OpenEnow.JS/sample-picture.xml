@@ -1,0 +1,27 @@
+<Picture>
+      <Source>id://944acab37cce4d78a5a7871f9e1d1460</Source>
+      <PictureName>file0.png</PictureName>
+      <Alpha>1</Alpha>
+      <DisplayRegion>
+        <Rectangle>0,0,152,203</Rectangle>
+      </DisplayRegion>
+      <Style>
+        <StyleType>None</StyleType>
+        <PicturePresetStyle>None</PicturePresetStyle>
+      </Style>
+      <MetaData>
+        <PictureSize>203,152</PictureSize>
+        <FileSize>6285</FileSize>
+      </MetaData>
+      <Id>e475a4bf-1683-47ec-a8fa-ae64e2b0b039</Id>
+      <X>75.675</X>
+      <Y>29.468</Y>
+      <Width>232.314</Width>
+      <Height>173.95</Height>
+      <Rotation>0</Rotation>
+      <IsLocked>False</IsLocked>
+      <CanClone>False</CanClone>
+      <Hyperlink/>
+      <HasMask>False</HasMask>
+      <RotateOrigin>0.5,0.5</RotateOrigin>
+    </Picture>

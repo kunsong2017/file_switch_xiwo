@@ -17,7 +17,7 @@ export async function exportENBX(questions,pages,options,onProgress) {
   for(let i=0;i<chosen.length;i++) {
     onProgress(`正在生成希沃原生课件 · 第 ${i+1} / ${chosen.length} 题`,(i+1)/(chosen.length+1));
     await new Promise(resolve=>setTimeout(resolve,0));
-    const canvas=renderPage(chosen[i],pages,options,i,chosen.length);
+    const canvas=renderPage(chosen[i],pages,options,i,chosen.length,2);
     slides.push({png:await pngBytes(canvas),width:canvas.width,height:canvas.height});
     if(i===0) {
       const preview=document.createElement('canvas');

@@ -3,6 +3,9 @@ import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {renderAsync} from 'docx-preview';
 import {toCanvas} from 'html-to-image';
 import {configureOfflinePDF, offlineOCR} from './offline.js';
+import {pageLayout, mergeGraphics} from './layout.js';
+import {pdfGraphics} from './pdf-graphics.js';
+import {rasterGraphics} from './raster-graphics.js';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 const offlinePDFOptions = configureOfflinePDF(pdfjs);
 
@@ -43,7 +46,8 @@ async function readPDF(data, onProgress) {
       });
       // PDF text runs can split a number, punctuation and stem into separate items.
       const lines = groupTextRuns(raw);
-      pages.push(makePage(canvas, lines, [0.025, 0.965]));
+      const graphics = pdfGraphics(await page.getOperatorList(), view.transform, canvas.width, canvas.height, pdfjs.OPS);
+      pages.push(makePage(canvas, lines, [0.015, 0.985], graphics));
       page.cleanup();
     }
     return pages;
@@ -68,9 +72,10 @@ function groupTextRuns(raw) {
     for (const run of row.runs.sort((a, b) => a.x - b.x)) {
       // Preserve separate columns instead of joining both stems into one line.
       if (!line || run.x - (line.x + line.w) > 0.065) {
-        line = {...run};
+        line = {...run, runs:[run]};
         result.push(line);
       } else {
+        line.runs.push(run);
         const gap = run.x - (line.x + line.w);
         line.text += (gap > 0.008 ? ' ' : '') + run.text;
         line.w = Math.max(line.w, run.x + run.w - line.x);
@@ -90,7 +95,7 @@ async function readDOCX(data, onProgress) {
     await renderAsync(data, root, null, {
       className: 'exam-docx', inWrapper: false, ignoreLastRenderedPageBreak: false,
       useBase64URL: true, renderAltChunks: false, renderComments: false,
-      renderHeaders: true, renderFooters: true, breakPages: true,
+      renderHeaders: false, renderFooters: false, breakPages: true,
     });
     root.querySelectorAll('script,iframe,object,embed').forEach(el => el.remove());
     root.querySelectorAll('*').forEach(el => {
@@ -117,6 +122,10 @@ async function readDOCX(data, onProgress) {
       const standardHeight = Math.max(900, Math.min(1600, declaredHeight));
       const bounds = section.getBoundingClientRect();
       const lines = [];
+      const graphics = Array.from(section.querySelectorAll('img,svg')).map(element => {
+        const rect = element.getBoundingClientRect();
+        return {x:(rect.x-bounds.x)/width,y:rect.y-bounds.y,w:rect.width/width,h:rect.height};
+      }).filter(rect=>rect.w>0 && rect.h>0);
       for (const p of section.querySelectorAll('p')) {
         const rect = p.getBoundingClientRect();
         if (!p.textContent.trim() || !rect.height) continue;
@@ -151,7 +160,8 @@ async function readDOCX(data, onProgress) {
           filter: node => !(node.tagName === 'SCRIPT'),
         });
         const sliceLines = lines.filter(l => l.y + l.h > offset && l.y < offset + height).map(l => ({...l, text: l.y < offset ? '' : l.text, y: Math.max(0, l.y - offset) / height, h: Math.min(l.h, height, l.y + l.h - offset) / height}));
-        pages.push(makePage(canvas, sliceLines, [0, 1]));
+        const sliceGraphics = graphics.filter(g=>g.y+g.h>offset && g.y<offset+height).map(g=>({...g,y:Math.max(0,g.y-offset)/height,h:Math.min(g.y+g.h,offset+height)/height-Math.max(offset,g.y)/height}));
+        pages.push(makePage(canvas, sliceLines, [0, 1], mergeGraphics(sliceGraphics)));
       }
     }
     return pages;
@@ -160,9 +170,17 @@ async function readDOCX(data, onProgress) {
   }
 }
 
-function makePage(canvas, lines, contentRange) {
+function makePage(canvas, lines, contentRange, graphics = []) {
   const {width, height} = canvas;
   const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data;
+  const exclusions = pageLayout({lines, contentRange, graphics}).exclusions;
+  for (const rect of exclusions) {
+    for (let y=Math.max(0,Math.floor(rect.y*height));y<Math.min(height,Math.ceil((rect.y+rect.h)*height));y++) {
+      for(let x=Math.max(0,Math.floor(rect.x*width));x<Math.min(width,Math.ceil((rect.x+rect.w)*width));x++) {
+        const at=(y*width+x)*4; pixels[at]=pixels[at+1]=pixels[at+2]=255;
+      }
+    }
+  }
   const bottoms = {};
   // Include diagrams beneath the last text line; text extraction alone cannot
   // see embedded images, vector geometry or handwritten work.
@@ -174,7 +192,7 @@ function makePage(canvas, lines, contentRange) {
         let ink = 0;
         for (let x = Math.floor(width * (col / columns + 0.012)); x < width * ((col + 1) / columns - 0.012); x += 2) {
           const at = (y * width + x) * 4;
-          if (pixels[at] < 220 && pixels[at + 1] < 220 && pixels[at + 2] < 220 && ++ink >= 4) {
+          if (Math.min(pixels[at],pixels[at+1],pixels[at+2]) < 220 && ++ink >= 4) {
             bottom = Math.min(contentRange[1], (y + 3) / height);
             break outer;
           }
@@ -183,7 +201,7 @@ function makePage(canvas, lines, contentRange) {
       bottoms[columns].push(bottom);
     }
   }
-  return {canvas, width, height, lines, bottoms, contentRange, url: canvas.toDataURL('image/jpeg', 0.9)};
+  return {canvas, width, height, lines, graphics, exclusions, bottoms, contentRange, url: canvas.toDataURL('image/jpeg', 0.9)};
 }
 
 export async function recognizePages(pages, onProgress) {
@@ -199,16 +217,21 @@ export async function recognizePages(pages, onProgress) {
     for (index = 0; index < pages.length; index++) {
       const page = pages[index];
       const {data} = await worker.recognize(page.canvas, {}, {blocks: true, text: true});
-      const lines = [];
+      const raw = [];
       for (const block of data.blocks || []) {
         for (const paragraph of block.paragraphs || []) {
           for (const line of paragraph.lines || []) {
-            const b = line.bbox;
-            lines.push({text: line.text, x: b.x0 / page.width, y: b.y0 / page.height, w: (b.x1 - b.x0) / page.width, h: (b.y1 - b.y0) / page.height});
+            for (const word of line.words?.length ? line.words : [line]) {
+              const b = word.bbox;
+              raw.push({text:word.text,x:b.x0/page.width,y:b.y0/page.height,w:(b.x1-b.x0)/page.width,h:(b.y1-b.y0)/page.height});
+            }
           }
         }
       }
-      page.lines = lines;
+      const lines = groupTextRuns(raw).map(line => line.x<.16 ? {...line,text:line.text.replace(/^[Il|l]{1,3}(?=\s*[,，.．、])/,value=>value.replace(/[Il|l]/g,'1'))} : line);
+      const embedded=page.graphics.filter(g=>!g.raster);
+      const recovered=rasterGraphics(page.canvas,lines).filter(g=>!embedded.some(e=>e.x<=g.x && e.y<=g.y && e.x+e.w>=g.x+g.w && e.y+e.h>=g.y+g.h));
+      Object.assign(page,makePage(page.canvas,lines,page.contentRange,[...embedded,...recovered]));
     }
   } finally {
     await worker?.terminate();

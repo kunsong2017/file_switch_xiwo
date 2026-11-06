@@ -21,6 +21,8 @@
 3. 拖动选框移动，拖右下角缩放；也可以用「框选题目」新增选框。支持合并、拆分、排序、改标题、勾选及撤销。
 4. 在「导出格式」选择 PowerPoint、希沃导入版或希沃原生，再选 16:9 / 4:3、配色、题目标题和讲解留白，生成并下载课件。
 
+单栏 PDF 会按题号匹配集中排列的配图，包括题干与「第 N 题」配图位于不同页的情况；扫描件需先做 OCR。题干、选项和配图组合在同一页，原卷的「第 N 页，共 N 页」等页码在导出时去除。仍请在导出前检查自动识别结果。
+
 标题可以在 PowerPoint / WPS 中编辑。**题干以图片保留，不能直接编辑图片中的文字。**
 
 ## 希沃白板导出
@@ -35,7 +37,7 @@
 
 选择「希沃原生」，会生成 `课件名称-希沃原生课件.enbx`。这是含有 `Board.xml`、`Slides/Slide_N.xml`、资源关系、PNG 图片、元数据及缩略图的实际 ENBX 包，每道已勾选的题目对应一页。课件的比例、配色、标题和讲解留白与希沃导入版一致，整页以图片保留，可在希沃中添加批注及其他元素，图片中的文字不能直接编辑。
 
-文件结构与静态类型契约参考 MIT 授权的 [OpenEnow.JS 原生样例](https://github.com/EZ118/OpenEnow.JS/tree/main/sample)，授权和来源在 `third_party/OpenEnow.JS/`。资源使用真实内容 MD5；XML 编码和声明方式与样例一致。
+文件结构与静态类型契约参考 MIT 授权的 [OpenEnow.JS 原生样例](https://github.com/EZ118/OpenEnow.JS/tree/main/sample)，授权和来源在 `third_party/OpenEnow.JS/`。资源使用真实内容 MD5；XML 编码和声明方式与样例一致。原生页使用 720 高的逻辑坐标，16:9 / 4:3 分别配合 3200×1800 / 2400×1800 图片；图片尺寸与裁剪字段遵循原生样例，题目完整等比放入页面。
 
 已完成 XML / 页序 / 资源校验，并用独立 OpenEnow.JS 读取器加载 PDF、Word 来源的原生课件。**这不等于已通过真实希沃白板客户端验收**，因此界面标记为试用；请先用你的希沃白板版本打开一份样例确认兼容性。
 
@@ -93,10 +95,13 @@ npm run dev -- --port 5187
 # 另一个终端；默认使用 /usr/bin/google-chrome，也可设置 CHROME_PATH
 npm run test:browser
 npm run test:enbx
+npm run test:exams
 npm run test:offline
 ```
 
 单元测试覆盖题号、跨页、双栏和裁切边界；浏览器测试覆盖真实 PDF / DOCX、图片与公式、自动编号、长文档、框选、撤销、合并拆分、选中导出、16:9 / 4:3、移动端布局以及实际下载的 PPTX 页数与嵌入图片。原始原创示例在 `public/examples/`，重建示例：`python3 scripts/generate-examples.py`（需要 ReportLab、Pillow）。
+
+`npm run test:exams` 使用用户提供的 `tests/初三数学期中综合复习2.pdf`（27 题）和 `tests/初三数学复习卷 6.pdf`（扫描件，OCR 后 26 题）。检查连续题号、人工标注的配图归属、关键题干 / 公式 / 字母标注保留及原卷页码排除，并实际导出三种格式。测试截图与课件保存在忽略的 `test-results/real-exams/`，不替代希沃客户端验收。`test:offline` 也覆盖这两份试卷的断网导入、OCR 与原生导出。
 
 ## 上游项目
 
@@ -106,7 +111,7 @@ npm run test:offline
 
 ## 工程维护与自动检查
 
-使用 Node.js 22（见 `.nvmrc`）。仓库仅保存源码、固定版本依赖清单和原创测试样例；PDF 字体、OCR 引擎、语言包及第三方授权文本由准备脚本生成。
+使用 Node.js 22（见 `.nvmrc`）。仓库保存源码、固定版本依赖清单、测试样例和可运行的 `offline/`；PDF 字体、OCR 引擎、语言包及第三方授权文本由准备脚本生成。
 
 GitHub Actions 配置位于 `.github/workflows/ci.yml`，包含干净安装、资源准备、单元测试、生产构建、浏览器导出及本地 OCR 测试，并上传静态站点产物。源码提交与网页发布相互独立。
 

@@ -64,7 +64,7 @@ try {
   const nativePending=page.waitForEvent('download');
   await page.locator('[data-action="export"]').click();
   const native=await nativePending;
-  await validateENBX(await JSZip.loadAsync(await readFile(await native.path())),6,{width:1600,height:900});
+  await validateENBX(await JSZip.loadAsync(await readFile(await native.path())),6,{width:3200,height:1800});
   console.log('PASS extracted offline package exports actual native ENBX without external services');
   const port = new URL(server.url).port;
   let second;

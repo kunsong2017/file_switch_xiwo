@@ -51,6 +51,8 @@ jobs:
           npm run test:enbx
           npm run test:ocr
           npm run test:package
+          npm run test:exams
+          npm run test:enbx -- --real-exams
       - name: Test extracted standalone HTML without a server
         run: |
           npm run test:offline

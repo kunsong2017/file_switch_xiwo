@@ -156,17 +156,18 @@ async function runOCR() {
   state.message = '正在准备本地 OCR 引擎…';
   state.progress = 0;
   render();
-  // Retain the previous text data if recognition fails midway.
-  const originalLines = state.pages.map(p => p.lines);
+  // Retain text, graphics and content bounds if recognition fails midway.
+  const originalPages = state.pages.map(p => ({...p}));
   try {
     await recognizePages(state.pages, progress);
+    cache.clear();
     snapshot();
     state.questions = segmentPages(state.pages, state.columns);
     state.selected = state.questions[0]?.id || null;
     state.notice = 'OCR 用于识别题号，导出仍使用试卷原图。请校对拆分，特别是模糊、倾斜和多栏试卷；原有手动拆分可撤销恢复。';
     toast(`OCR 完成，拆分出 ${state.questions.length} 道题`);
   } catch (e) {
-    state.pages.forEach((p, i) => p.lines = originalLines[i]);
+    state.pages.forEach((p, i) => Object.assign(p,originalPages[i]));
     console.error(e);
     toast('OCR 未能完成。可以直接框选题目，或稍后重新识别。');
   } finally {state.busy = false; render();}
