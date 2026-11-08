@@ -17,7 +17,8 @@
     "test:package": "node tests/package.mjs",
     "test:enbx": "node tests/enbx-reader.mjs",
     "test:offline": "node tests/offline.mjs",
-    "test:exams": "node tests/exams.mjs"
+    "test:exams": "node tests/exams.mjs",
+    "answer:proxy": "node scripts/answer-proxy.mjs"
   },
   "dependencies": {
     "docx-preview": "0.3.7",

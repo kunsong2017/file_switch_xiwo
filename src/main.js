@@ -4,13 +4,14 @@ import {readDocument, recognizePages} from './document.js';
 import {segmentPages, normalizeCrop, splitQuestion, clamp} from './segment.js';
 import {composeQuestion, exportPPTX, themes} from './export.js';
 import {parseSolutionsText, parseSolutionsJSON, applySolutions, buildSolutionExport, solutionStats, hasSolution} from './solutions.js';
+import {answerProviders, providerById, solveQuestion} from './answer.js';
 import {resourceURL} from './offline.js';
 
 const app = document.getElementById('app');
 const iconSet = {FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus, X, Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Scissors, Layers, ScanLine, MousePointer2, Undo2, Trash2, ZoomIn, ZoomOut, CircleHelp, ShieldCheck, Monitor, Settings2, BookOpen, Presentation, Sparkles, RotateCcw, Columns2, Crop, CircleCheck};
 const icon = name => `<i data-lucide="${name}"></i>`;
 const esc = str => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false, solutions: 'none'}};
+const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false, solutions: 'none'}, auto: {preset: 'zhipu', base: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', model: 'glm-4v-flash', key: '', proxy: 'http://127.0.0.1:5199/api/answer'}};
 let toastTimer;
 let drag = null;
 const cache = new Map();
@@ -81,7 +82,7 @@ function questionPanel() {
   return `<aside class="question-panel"><div class="panel-heading"><b>题目清单 <span class="count-badge">${state.questions.length}</span></b><button class="text-button" data-action="all">${chosen().length === state.questions.length && state.questions.length ? '取消全选' : '全部选中'}</button></div><div class="question-list">${state.questions.length ? state.questions.map((item, i) => `<div class="question-card ${item.id === state.selected ? 'selected' : ''}" data-action="select" data-id="${esc(item.id)}"><label class="checkbox" title="是否导出这道题"><input type="checkbox" data-field="include" data-id="${esc(item.id)}" ${item.included ? 'checked' : ''} aria-label="导出${esc(item.title)}"/><span></span></label><div class="question-card-text"><b>${esc(item.title)}${hasSolution(item) ? '<span class="solution-badge" title="已填写答案与解析">答</span>' : ''}</b><p>${esc(item.text || '手动框选的题目')}</p><small>第 ${[...new Set(item.segments.map(s => s.page + 1))].join('、')} 页${item.segments.length > 1 ? ' · 多片段' : ''}</small></div><span class="question-index">${String(i + 1).padStart(2, '0')}</span></div>`).join('') : `<div class="no-questions">${icon('scan-line')}<b>还没有拆出题目</b><p>可以启用 OCR 识别扫描件，<br>或点击「框选题目」手动添加。</p><button class="button secondary" data-action="mode" data-value="crop">${icon('plus')}框选第一题</button></div>`}</div>${q ? `<div class="selection-editor"><div class="selection-title"><span>当前题目</span><div><button class="icon-button" data-action="up" aria-label="上移题目" title="上移">${icon('chevron-up')}</button><button class="icon-button" data-action="down" aria-label="下移题目" title="下移">${icon('chevron-down')}</button><button class="icon-button danger" data-action="delete" aria-label="删除题目" title="删除">${icon('trash-2')}</button></div></div><input class="title-input" aria-label="题目标题" data-field="question-title" value="${esc(q.title)}" maxlength="80"/><div class="mini-preview ${state.options.ratio === '4:3' ? 'ratio-standard' : ''}" style="background:#${theme.background};color:#${theme.ink}">${state.options.headings ? `<b>${esc(q.title)}</b>` : ''}<img src="${imageFor(q)}" alt="当前题目的课件预览" style="max-height:${state.options.blankSpace ? '48%' : '73%'}"/>${state.options.blankSpace ? '<span class="preview-blank">思考与板书 ─────────</span>' : ''}<small>课件预览</small></div><div class="edit-actions"><button data-action="merge" ${state.questions.indexOf(q) === state.questions.length - 1 ? 'disabled' : ''}>${icon('layers')}合并下一题</button><button data-action="split">${icon('scissors')}从中间拆分</button></div><details class="crop-details"><summary>精确调整选框 <span>百分比</span></summary>${q.segments.map((s, i) => `<div class="segment-editor"><small>片段 ${i + 1} · 原卷第 ${s.page + 1} 页</small><div>${[['x','左'],['y','上'],['w','宽'],['h','高']].map(([key, label]) => `<label>${label}<input type="number" min="0" max="100" step="0.1" value="${(s[key] * 100).toFixed(1)}" data-field="crop" data-key="${key}" data-index="${i}" aria-label="片段${i + 1}${label}"/></label>`).join('')}</div></div>`).join('')}</details><details class="solution-editor" ${hasSolution(q) ? '' : 'open'}><summary>答案与解析 <span>${hasSolution(q) ? '已填写' : '未填写'}</span></summary><label>答案<textarea data-field="question-answer" rows="2" placeholder="例如：D，或 x₁=1，x₂=-5">${esc(q.answer)}</textarea></label><label>解析<textarea data-field="question-analysis" rows="6" placeholder="解题步骤、关键思路、易错点……">${esc(q.analysis)}</textarea></label><p class="solution-tip">导出时默认隐藏；可在「课件设置 → 答案与解析」选择每题后一页或同页点击出现。</p></details></div>` : ''}<div class="question-panel-bottom"><span>已选择 <b>${chosen().length}</b> 道题</span><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>课件设置${icon('arrow-right')}</button></div></aside>`;
 }
 function workspace() {
-  return `<section class="workspace"><div class="workspace-heading"><div><span class="eyebrow small">从原卷到课件，只差一步校对</span><h1>${esc(state.file.name)}<span class="file-type">${esc(state.file.name.split('.').pop().toUpperCase())}</span></h1><p>自动拆分后，请确认选框包含完整题干、图片与选项。</p></div><div class="workspace-heading-actions"><button class="button secondary" data-action="upload">${icon('upload')}更换试卷</button><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>${icon('download')}导出课件<span>${chosen().length}</span></button></div></div><div class="workspace-status"><div><span class="success-dot"></span>已读取 ${state.pages.length} 页<span class="dot-separator">·</span>拆分出 ${state.questions.length} 道题<span class="needs-check">请校对</span></div><div class="detection-tools"><label>原卷版式<select data-field="columns" aria-label="原卷版式"><option value="1" ${state.columns === 1 ? 'selected' : ''}>单栏试卷</option><option value="2" ${state.columns === 2 ? 'selected' : ''}>双栏试卷</option></select></label><button class="text-button" data-action="resplit">${icon('rotate-ccw')}重新拆分</button><button class="text-button" data-action="ocr">${icon('scan-line')}扫描件 OCR</button><button class="text-button" data-action="answers">${icon('book-open')}答案与解析</button></div></div>${state.notice ? `<div class="notice">${icon('circle-help')}<span>${esc(state.notice)}</span><button class="icon-button" data-action="dismiss" aria-label="关闭提示">${icon('x')}</button></div>` : ''}<div class="editor-grid">${pagePicker()}${paperView()}${questionPanel()}</div></section>`;
+  return `<section class="workspace"><div class="workspace-heading"><div><span class="eyebrow small">从原卷到课件，只差一步校对</span><h1>${esc(state.file.name)}<span class="file-type">${esc(state.file.name.split('.').pop().toUpperCase())}</span></h1><p>自动拆分后，请确认选框包含完整题干、图片与选项。</p></div><div class="workspace-heading-actions"><button class="button secondary" data-action="upload">${icon('upload')}更换试卷</button><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>${icon('download')}导出课件<span>${chosen().length}</span></button></div></div><div class="workspace-status"><div><span class="success-dot"></span>已读取 ${state.pages.length} 页<span class="dot-separator">·</span>拆分出 ${state.questions.length} 道题<span class="needs-check">请校对</span></div><div class="detection-tools"><label>原卷版式<select data-field="columns" aria-label="原卷版式"><option value="1" ${state.columns === 1 ? 'selected' : ''}>单栏试卷</option><option value="2" ${state.columns === 2 ? 'selected' : ''}>双栏试卷</option></select></label><button class="text-button" data-action="resplit">${icon('rotate-ccw')}重新拆分</button><button class="text-button" data-action="ocr">${icon('scan-line')}扫描件 OCR</button><button class="text-button" data-action="answers">${icon('book-open')}答案与解析</button><button class="text-button" data-action="auto">${icon('sparkles')}自动解答</button></div></div>${state.notice ? `<div class="notice">${icon('circle-help')}<span>${esc(state.notice)}</span><button class="icon-button" data-action="dismiss" aria-label="关闭提示">${icon('x')}</button></div>` : ''}<div class="editor-grid">${pagePicker()}${paperView()}${questionPanel()}</div></section>`;
 }
 function settingsModal() {
   const options = state.options;
@@ -116,10 +117,17 @@ function answersModal() {
 第 3 题 答案：4√3
 解析：……</pre><p>题号与试卷拆分出的题号对应；没有题号时按题目顺序匹配。</p></details><div class="answers-actions"><button class="button secondary" data-action="answers-json">${icon('upload')}导入 JSON</button><button class="button secondary" data-action="answers-template">${icon('download')}导出当前答案</button><button class="button primary" data-action="apply-answers">${icon('check')}导入粘贴内容</button></div></section></div>`;
 }
+function autoModal() {
+  const auto = state.auto;
+  const provider = providerById(auto.preset);
+  const pending = chosen().filter(q => !(q.answer || '').trim()).length;
+  const via = auto.preset === 'custom' ? (auto.via || 'direct') : provider.via;
+  return `<div class="modal-backdrop"><section class="modal answers-modal auto-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">AUTO SOLVE</span><h2 id="modal-title">让模型先做一遍</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><p class="answers-intro">开始后，每道未填写答案的题目截图会发送到你选择的模型服务。自动解答是可选功能；不使用时试卷仍只在本地处理。结果会写回每题，仍可人工修改。</p><div class="answers-stats"><span>待解答 <b>${pending}</b> 题</span><span>共 <b>${chosen().length}</b> 题</span></div><fieldset><legend>模型服务</legend><div class="solution-options">${answerProviders.map(p => `<button class="${auto.preset === p.id ? 'selected' : ''}" data-action="auto-provider" data-value="${p.id}"><b>${p.name}</b><small>${p.via === 'proxy' ? '需本地转发' : '浏览器直连'}</small></button>`).join('')}</div><p class="format-tip">${esc(provider.note)}</p></fieldset><label class="form-label">接口地址<input data-field="auto-base" value="${esc(auto.base)}" placeholder="https://…/chat/completions"/></label><label class="form-label">模型名称<input data-field="auto-model" value="${esc(auto.model)}" placeholder="glm-4v-flash / qwen-vl-plus"/></label><label class="form-label">API Key<input type="password" data-field="auto-key" value="${esc(auto.key)}" placeholder="只保存在本页内存，刷新即清空" autocomplete="off"/></label>${auto.preset === 'custom' ? `<label class="form-label">连接方式<select data-field="auto-via"><option value="direct" ${via === 'direct' ? 'selected' : ''}>浏览器直连</option><option value="proxy" ${via === 'proxy' ? 'selected' : ''}>经本地转发</option></select></label>` : ''}${via === 'proxy' ? `<label class="form-label">转发地址<input data-field="auto-proxy" value="${esc(auto.proxy)}" placeholder="http://127.0.0.1:5199/api/answer"/></label><p class="format-tip">先在项目目录运行 <code>npm run answer:proxy</code> 并保持窗口开启；它只转发请求，不在本地运行模型。</p>` : ''}<details class="answers-format"><summary>免费模型与 Key</summary><p>智谱 glm-4v-flash 是免费模型，注册开放平台后可创建 API Key，但不允许浏览器跨域，需本地转发。通义千问 VL 开通百炼后有免费额度，浏览器可直接调用。Key 只保存在本页内存。</p></details><div class="answers-actions"><button class="button secondary" data-action="close">取消</button><button class="button primary" data-action="auto-solve" ${!pending ? 'disabled' : ''}>${icon('sparkles')}开始自动解答</button></div></section></div>`;
+}
 function render() {
   const paperScroll = document.querySelector('.paper-scroll')?.scrollTop || 0;
   const listScroll = document.querySelector('.question-list')?.scrollTop || 0;
-  app.innerHTML = `<div class="app-shell">${sidebar()}<main>${header()}${state.file ? workspace() : emptyState()}</main></div><input id="file-input" type="file" accept=".pdf,.docx,.doc" hidden/><input id="answers-input" type="file" accept=".json,.txt,application/json,text/plain" hidden/>${state.modal === 'settings' ? settingsModal() : state.modal === 'help' ? helpModal() : state.modal === 'answers' ? answersModal() : ''}${state.busy ? `<div class="busy-overlay" role="alert" aria-busy="true"><div class="busy-card"><span class="busy-spinner"></span><h3 id="progress-label">${esc(state.message)}</h3><p>文件在本机处理，请稍等片刻</p><div class="progress-track"><div id="progress-bar" style="width:${state.progress * 100}%"></div></div></div></div>` : ''}`;
+  app.innerHTML = `<div class="app-shell">${sidebar()}<main>${header()}${state.file ? workspace() : emptyState()}</main></div><input id="file-input" type="file" accept=".pdf,.docx,.doc" hidden/><input id="answers-input" type="file" accept=".json,.txt,application/json,text/plain" hidden/>${state.modal === 'settings' ? settingsModal() : state.modal === 'help' ? helpModal() : state.modal === 'answers' ? answersModal() : state.modal === 'auto' ? autoModal() : ''}${state.busy ? `<div class="busy-overlay" role="alert" aria-busy="true"><div class="busy-card"><span class="busy-spinner"></span><h3 id="progress-label">${esc(state.message)}</h3><p>文件在本机处理，请稍等片刻</p><div class="progress-track"><div id="progress-bar" style="width:${state.progress * 100}%"></div></div></div></div>` : ''}`;
   app.querySelectorAll('a[href^="/examples/"]').forEach(link => {
     const source = link.getAttribute('href');
     link.href = resourceURL(source);
@@ -240,6 +248,42 @@ function downloadAnswers() {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
   toast(`已导出 ${data.questions.length} 题的答案与解析`);
 }
+async function runAutoSolve() {
+  const preset = providerById(state.auto.preset);
+  const provider = {base: state.auto.base, model: state.auto.model, via: state.auto.preset === 'custom' ? (state.auto.via || 'direct') : preset.via};
+  const queue = chosen().filter(q => !(q.answer || '').trim());
+  if (!queue.length) {toast('没有需要解答的题目'); return;}
+  if (!provider.base || !provider.model) {toast('请填写接口地址和模型名称'); return;}
+  if (!state.auto.key && state.auto.preset !== 'custom') {toast('请填写 API Key'); return;}
+  snapshot();
+  state.modal = null;
+  state.busy = true;
+  state.message = '正在自动解答…';
+  state.progress = 0;
+  render();
+  let done = 0;
+  try {
+    for (const q of queue) {
+      progress(`自动解答 · 第 ${done + 1} / ${queue.length} 题 · ${q.title}`, done / queue.length);
+      const canvas = composeQuestion(q, state.pages, 1400);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      canvas.width = 0;
+      const result = await solveQuestion({provider, dataUrl, apiKey: state.auto.key, proxyUrl: state.auto.proxy});
+      q.answer = result.answer;
+      q.analysis = result.analysis;
+      done++;
+      render();
+    }
+    if (state.options.solutions === 'none') state.options.solutions = 'reveal';
+    toast(`已自动解答 ${done} 题，请逐题核对`);
+  } catch (error) {
+    console.error(error);
+    toast(`自动解答中断（已完成 ${done} 题）：${error.message || error}`);
+  } finally {
+    state.busy = false;
+    render();
+  }
+}
 async function download() {
   if (!chosen().length || state.busy) return;
   state.busy = true;
@@ -288,6 +332,9 @@ app.addEventListener('click', event => {
     case 'resplit': resplit(); return;
     case 'ocr': runOCR(); return;
     case 'answers': state.modal = 'answers'; break;
+    case 'auto': state.modal = 'auto'; break;
+    case 'auto-provider': {const provider = providerById(button.dataset.value); state.auto.preset = provider.id; state.auto.base = provider.base; state.auto.model = provider.model; state.auto.via = provider.via;} break;
+    case 'auto-solve': runAutoSolve(); return;
     case 'apply-answers': applyAnswerText(document.getElementById('answers-text')?.value || ''); return;
     case 'answers-json': document.getElementById('answers-input').click(); return;
     case 'answers-template': downloadAnswers(); return;
@@ -324,6 +371,7 @@ app.addEventListener('change', event => {
     case 'include': snapshot(); state.questions.find(item => item.id === el.dataset.id).included = el.checked; break;
     case 'question-title': if (q) {snapshot(); q.title = el.value.trim() || '未命名题目';} break;
     case 'export-title': state.options.title = el.value.trim() || state.file.name.replace(/\.[^.]+$/, ''); return;
+    case 'auto-via': state.auto.via = el.value; break;
     case 'headings': case 'blankSpace': state.options[el.dataset.field] = el.checked; break;
     case 'crop': if (q) {snapshot(); const i = Number(el.dataset.index); q.segments[i] = normalizeCrop({...q.segments[i], [el.dataset.key]: Number(el.value) / 100});} break;
     default: return;
@@ -337,6 +385,10 @@ app.addEventListener('input', event => {
   if (field === 'question-answer' || field === 'question-analysis') {
     const q = selectedQuestion();
     if (q) q[field === 'question-answer' ? 'answer' : 'analysis'] = event.target.value;
+    return;
+  }
+  if (field === 'auto-base' || field === 'auto-model' || field === 'auto-key' || field === 'auto-proxy') {
+    state.auto[field.slice(5)] = event.target.value;
     return;
   }
   if (event.target.id === 'answers-text') state.answerDraft = event.target.value;

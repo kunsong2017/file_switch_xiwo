@@ -35,3 +35,6 @@
 .answers-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;justify-content:flex-end}
 #answers-text{display:block;width:100%;margin-top:10px;padding:11px 12px;border:1px solid #dbe4cd;border-radius:6px;background:#fff;color:#3d4a35;font:11px/1.8 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;resize:vertical}
 #answers-text:focus{outline:2px solid #cfe5a7;outline-offset:0;border-color:#a5c17e}
+.form-label>select{display:block;width:100%;margin-top:10px;border:1px solid #dbe4cd;background:#fff;padding:9px 10px;border-radius:6px;font-size:11px;color:#657852}
+.auto-modal .form-label{margin-top:12px}
+.auto-modal code{padding:1px 4px;background:#f0f3e9;border-radius:3px;font-size:9px;color:#5c6b50}

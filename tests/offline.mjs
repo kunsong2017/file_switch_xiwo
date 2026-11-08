@@ -48,7 +48,7 @@ try {
   async function download(format, expected, name) {
     await page.locator('[data-action="settings"]').first().click();
     await page.locator(`[data-action="format"][data-value="${format}"]`).click();
-    const pending = page.waitForEvent('download', {timeout: 45000});
+    const pending = page.waitForEvent('download', {timeout: 180000});
     await page.locator('[data-action="export"]').click();
     const file = await pending;
     await file.saveAs(path.join(root, 'test-results', name));

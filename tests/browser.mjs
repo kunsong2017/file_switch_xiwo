@@ -1,12 +1,25 @@
 import {chromium} from '@playwright/test';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import path from 'node:path';
 import JSZip from 'jszip';
 import {validateENBX} from './enbx-validation.mjs';
 const baseURL = process.env.EXAM_TEST_URL || 'http://127.0.0.1:5187';
 const results = path.resolve('test-results');
 await mkdir(results, {recursive:true});
+// 本地假模型接口：验证自动解答的请求、解析与回填，不访问外部服务。
+const fakeModel = http.createServer((request, response) => {
+  const headers = {'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Headers':'content-type,authorization', 'Access-Control-Allow-Methods':'POST,OPTIONS'};
+  if (request.method === 'OPTIONS') {response.writeHead(204, headers).end(); return;}
+  request.resume();
+  request.on('end', () => {
+    response.writeHead(200, {...headers, 'Content-Type':'application/json'});
+    response.end(JSON.stringify({choices:[{message:{content:'{"answer":"A","analysis":"自动解析：本地假接口返回。"}'}}]}));
+  });
+});
+await new Promise(resolve => fakeModel.listen(0, '127.0.0.1', resolve));
+const fakeModelURL = `http://127.0.0.1:${fakeModel.address().port}/v1/chat/completions`;
 const browser = await chromium.launch({executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless:true, args:['--no-sandbox','--disable-dev-shm-usage']});
 const context = await browser.newContext({viewport:{width:1440,height:1050}, acceptDownloads:true});
 const page = await context.newPage();
@@ -76,6 +89,19 @@ try {
   const dataURL = await page.locator('.paper-image').getAttribute('src');
   await writeFile(path.join(results,'sample-page.png'),Buffer.from(dataURL.split(',')[1],'base64'));
   await download('pdf-six-questions.pptx',6);
+  // 自动解答：自定义接口指向本地假模型，逐题回填答案与解析。
+  await page.locator('[data-action="auto"]').click();
+  await page.locator('[data-action="auto-provider"][data-value="custom"]').click();
+  await page.locator('[data-field="auto-base"]').fill(fakeModelURL);
+  await page.locator('[data-field="auto-model"]').fill('fake-vl');
+  await page.locator('[data-field="auto-key"]').fill('test-key');
+  await page.locator('[data-action="auto-solve"]').click();
+  await settle();
+  assert.equal(await page.locator('.solution-badge').count(),6,'auto solve fills every question');
+  await page.locator('[data-action="settings"]').first().click();
+  await page.locator('[data-action="solutions"][data-value="none"]').click();
+  await page.locator('[data-action="close"]').click();
+  console.log('PASS auto solve:每道题都写回答案与解析');
   // 答案与解析：批量粘贴 → 逐题标记 → 同页点击出现
   await page.locator('[data-action="answers"]').click();
   await page.locator('#answers-text').fill(['1. 答案：D\n解析：解析一','2. 答案：B\n解析：解析二','3. 答案：C\n解析：解析三','4. 答案：A\n解析：解析四','5. 答案：B\n解析：解析五','6. 答案：C\n解析：解析六'].join('\n\n'));
@@ -178,4 +204,4 @@ try {
   assert.ok(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth),'mobile homepage fits viewport');
   assert.deepEqual(errors,[],'no unexpected browser errors');
   console.log('PASS desktop/mobile layout and no browser exceptions');
-} finally {await browser.close();}
+} finally {await browser.close(); await new Promise(resolve => fakeModel.close(resolve));}
