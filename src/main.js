@@ -3,13 +3,14 @@ import {createIcons, FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus,
 import {readDocument, recognizePages} from './document.js';
 import {segmentPages, normalizeCrop, splitQuestion, clamp} from './segment.js';
 import {composeQuestion, exportPPTX, themes} from './export.js';
+import {parseSolutionsText, parseSolutionsJSON, applySolutions, buildSolutionExport, solutionStats, hasSolution} from './solutions.js';
 import {resourceURL} from './offline.js';
 
 const app = document.getElementById('app');
 const iconSet = {FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus, X, Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Scissors, Layers, ScanLine, MousePointer2, Undo2, Trash2, ZoomIn, ZoomOut, CircleHelp, ShieldCheck, Monitor, Settings2, BookOpen, Presentation, Sparkles, RotateCcw, Columns2, Crop, CircleCheck};
 const icon = name => `<i data-lucide="${name}"></i>`;
 const esc = str => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false}};
+const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false, solutions: 'none'}};
 let toastTimer;
 let drag = null;
 const cache = new Map();
@@ -77,25 +78,48 @@ function paperView() {
 function questionPanel() {
   const q = selectedQuestion();
   const theme = themes[state.options.theme];
-  return `<aside class="question-panel"><div class="panel-heading"><b>题目清单 <span class="count-badge">${state.questions.length}</span></b><button class="text-button" data-action="all">${chosen().length === state.questions.length && state.questions.length ? '取消全选' : '全部选中'}</button></div><div class="question-list">${state.questions.length ? state.questions.map((item, i) => `<div class="question-card ${item.id === state.selected ? 'selected' : ''}" data-action="select" data-id="${esc(item.id)}"><label class="checkbox" title="是否导出这道题"><input type="checkbox" data-field="include" data-id="${esc(item.id)}" ${item.included ? 'checked' : ''} aria-label="导出${esc(item.title)}"/><span></span></label><div class="question-card-text"><b>${esc(item.title)}</b><p>${esc(item.text || '手动框选的题目')}</p><small>第 ${[...new Set(item.segments.map(s => s.page + 1))].join('、')} 页${item.segments.length > 1 ? ' · 多片段' : ''}</small></div><span class="question-index">${String(i + 1).padStart(2, '0')}</span></div>`).join('') : `<div class="no-questions">${icon('scan-line')}<b>还没有拆出题目</b><p>可以启用 OCR 识别扫描件，<br>或点击「框选题目」手动添加。</p><button class="button secondary" data-action="mode" data-value="crop">${icon('plus')}框选第一题</button></div>`}</div>${q ? `<div class="selection-editor"><div class="selection-title"><span>当前题目</span><div><button class="icon-button" data-action="up" aria-label="上移题目" title="上移">${icon('chevron-up')}</button><button class="icon-button" data-action="down" aria-label="下移题目" title="下移">${icon('chevron-down')}</button><button class="icon-button danger" data-action="delete" aria-label="删除题目" title="删除">${icon('trash-2')}</button></div></div><input class="title-input" aria-label="题目标题" data-field="question-title" value="${esc(q.title)}" maxlength="80"/><div class="mini-preview ${state.options.ratio === '4:3' ? 'ratio-standard' : ''}" style="background:#${theme.background};color:#${theme.ink}">${state.options.headings ? `<b>${esc(q.title)}</b>` : ''}<img src="${imageFor(q)}" alt="当前题目的课件预览" style="max-height:${state.options.blankSpace ? '48%' : '73%'}"/>${state.options.blankSpace ? '<span class="preview-blank">思考与板书 ─────────</span>' : ''}<small>课件预览</small></div><div class="edit-actions"><button data-action="merge" ${state.questions.indexOf(q) === state.questions.length - 1 ? 'disabled' : ''}>${icon('layers')}合并下一题</button><button data-action="split">${icon('scissors')}从中间拆分</button></div><details class="crop-details"><summary>精确调整选框 <span>百分比</span></summary>${q.segments.map((s, i) => `<div class="segment-editor"><small>片段 ${i + 1} · 原卷第 ${s.page + 1} 页</small><div>${[['x','左'],['y','上'],['w','宽'],['h','高']].map(([key, label]) => `<label>${label}<input type="number" min="0" max="100" step="0.1" value="${(s[key] * 100).toFixed(1)}" data-field="crop" data-key="${key}" data-index="${i}" aria-label="片段${i + 1}${label}"/></label>`).join('')}</div></div>`).join('')}</details></div>` : ''}<div class="question-panel-bottom"><span>已选择 <b>${chosen().length}</b> 道题</span><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>课件设置${icon('arrow-right')}</button></div></aside>`;
+  return `<aside class="question-panel"><div class="panel-heading"><b>题目清单 <span class="count-badge">${state.questions.length}</span></b><button class="text-button" data-action="all">${chosen().length === state.questions.length && state.questions.length ? '取消全选' : '全部选中'}</button></div><div class="question-list">${state.questions.length ? state.questions.map((item, i) => `<div class="question-card ${item.id === state.selected ? 'selected' : ''}" data-action="select" data-id="${esc(item.id)}"><label class="checkbox" title="是否导出这道题"><input type="checkbox" data-field="include" data-id="${esc(item.id)}" ${item.included ? 'checked' : ''} aria-label="导出${esc(item.title)}"/><span></span></label><div class="question-card-text"><b>${esc(item.title)}${hasSolution(item) ? '<span class="solution-badge" title="已填写答案与解析">答</span>' : ''}</b><p>${esc(item.text || '手动框选的题目')}</p><small>第 ${[...new Set(item.segments.map(s => s.page + 1))].join('、')} 页${item.segments.length > 1 ? ' · 多片段' : ''}</small></div><span class="question-index">${String(i + 1).padStart(2, '0')}</span></div>`).join('') : `<div class="no-questions">${icon('scan-line')}<b>还没有拆出题目</b><p>可以启用 OCR 识别扫描件，<br>或点击「框选题目」手动添加。</p><button class="button secondary" data-action="mode" data-value="crop">${icon('plus')}框选第一题</button></div>`}</div>${q ? `<div class="selection-editor"><div class="selection-title"><span>当前题目</span><div><button class="icon-button" data-action="up" aria-label="上移题目" title="上移">${icon('chevron-up')}</button><button class="icon-button" data-action="down" aria-label="下移题目" title="下移">${icon('chevron-down')}</button><button class="icon-button danger" data-action="delete" aria-label="删除题目" title="删除">${icon('trash-2')}</button></div></div><input class="title-input" aria-label="题目标题" data-field="question-title" value="${esc(q.title)}" maxlength="80"/><div class="mini-preview ${state.options.ratio === '4:3' ? 'ratio-standard' : ''}" style="background:#${theme.background};color:#${theme.ink}">${state.options.headings ? `<b>${esc(q.title)}</b>` : ''}<img src="${imageFor(q)}" alt="当前题目的课件预览" style="max-height:${state.options.blankSpace ? '48%' : '73%'}"/>${state.options.blankSpace ? '<span class="preview-blank">思考与板书 ─────────</span>' : ''}<small>课件预览</small></div><div class="edit-actions"><button data-action="merge" ${state.questions.indexOf(q) === state.questions.length - 1 ? 'disabled' : ''}>${icon('layers')}合并下一题</button><button data-action="split">${icon('scissors')}从中间拆分</button></div><details class="crop-details"><summary>精确调整选框 <span>百分比</span></summary>${q.segments.map((s, i) => `<div class="segment-editor"><small>片段 ${i + 1} · 原卷第 ${s.page + 1} 页</small><div>${[['x','左'],['y','上'],['w','宽'],['h','高']].map(([key, label]) => `<label>${label}<input type="number" min="0" max="100" step="0.1" value="${(s[key] * 100).toFixed(1)}" data-field="crop" data-key="${key}" data-index="${i}" aria-label="片段${i + 1}${label}"/></label>`).join('')}</div></div>`).join('')}</details><details class="solution-editor" ${hasSolution(q) ? '' : 'open'}><summary>答案与解析 <span>${hasSolution(q) ? '已填写' : '未填写'}</span></summary><label>答案<textarea data-field="question-answer" rows="2" placeholder="例如：D，或 x₁=1，x₂=-5">${esc(q.answer)}</textarea></label><label>解析<textarea data-field="question-analysis" rows="6" placeholder="解题步骤、关键思路、易错点……">${esc(q.analysis)}</textarea></label><p class="solution-tip">导出时默认隐藏；可在「课件设置 → 答案与解析」选择每题后一页或同页点击出现。</p></details></div>` : ''}<div class="question-panel-bottom"><span>已选择 <b>${chosen().length}</b> 道题</span><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>课件设置${icon('arrow-right')}</button></div></aside>`;
 }
 function workspace() {
-  return `<section class="workspace"><div class="workspace-heading"><div><span class="eyebrow small">从原卷到课件，只差一步校对</span><h1>${esc(state.file.name)}<span class="file-type">${esc(state.file.name.split('.').pop().toUpperCase())}</span></h1><p>自动拆分后，请确认选框包含完整题干、图片与选项。</p></div><div class="workspace-heading-actions"><button class="button secondary" data-action="upload">${icon('upload')}更换试卷</button><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>${icon('download')}导出课件<span>${chosen().length}</span></button></div></div><div class="workspace-status"><div><span class="success-dot"></span>已读取 ${state.pages.length} 页<span class="dot-separator">·</span>拆分出 ${state.questions.length} 道题<span class="needs-check">请校对</span></div><div class="detection-tools"><label>原卷版式<select data-field="columns" aria-label="原卷版式"><option value="1" ${state.columns === 1 ? 'selected' : ''}>单栏试卷</option><option value="2" ${state.columns === 2 ? 'selected' : ''}>双栏试卷</option></select></label><button class="text-button" data-action="resplit">${icon('rotate-ccw')}重新拆分</button><button class="text-button" data-action="ocr">${icon('scan-line')}扫描件 OCR</button></div></div>${state.notice ? `<div class="notice">${icon('circle-help')}<span>${esc(state.notice)}</span><button class="icon-button" data-action="dismiss" aria-label="关闭提示">${icon('x')}</button></div>` : ''}<div class="editor-grid">${pagePicker()}${paperView()}${questionPanel()}</div></section>`;
+  return `<section class="workspace"><div class="workspace-heading"><div><span class="eyebrow small">从原卷到课件，只差一步校对</span><h1>${esc(state.file.name)}<span class="file-type">${esc(state.file.name.split('.').pop().toUpperCase())}</span></h1><p>自动拆分后，请确认选框包含完整题干、图片与选项。</p></div><div class="workspace-heading-actions"><button class="button secondary" data-action="upload">${icon('upload')}更换试卷</button><button class="button primary" data-action="settings" ${!chosen().length ? 'disabled' : ''}>${icon('download')}导出课件<span>${chosen().length}</span></button></div></div><div class="workspace-status"><div><span class="success-dot"></span>已读取 ${state.pages.length} 页<span class="dot-separator">·</span>拆分出 ${state.questions.length} 道题<span class="needs-check">请校对</span></div><div class="detection-tools"><label>原卷版式<select data-field="columns" aria-label="原卷版式"><option value="1" ${state.columns === 1 ? 'selected' : ''}>单栏试卷</option><option value="2" ${state.columns === 2 ? 'selected' : ''}>双栏试卷</option></select></label><button class="text-button" data-action="resplit">${icon('rotate-ccw')}重新拆分</button><button class="text-button" data-action="ocr">${icon('scan-line')}扫描件 OCR</button><button class="text-button" data-action="answers">${icon('book-open')}答案与解析</button></div></div>${state.notice ? `<div class="notice">${icon('circle-help')}<span>${esc(state.notice)}</span><button class="icon-button" data-action="dismiss" aria-label="关闭提示">${icon('x')}</button></div>` : ''}<div class="editor-grid">${pagePicker()}${paperView()}${questionPanel()}</div></section>`;
 }
 function settingsModal() {
   const options = state.options;
   const seewo = options.format === 'seewo';
   const enbx = options.format === 'enbx';
   const pictureMode = seewo || enbx;
-  return `<div class="modal-backdrop"><section class="modal export-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">READY FOR YOUR CLASS</span><h2 id="modal-title">最后一步，准备上课。</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><div class="export-layout"><div class="export-form"><label class="form-label">课件名称<input data-field="export-title" value="${esc(options.title)}" maxlength="100" placeholder="例如：七年级数学课堂练习"/></label><fieldset class="format-fieldset"><legend>导出格式</legend><div class="format-options"><button class="${options.format === 'pptx' ? 'selected' : ''}" data-action="format" data-value="pptx"><b>PowerPoint</b><small>.pptx · PowerPoint / WPS</small></button><button class="${seewo ? 'selected' : ''}" data-action="format" data-value="seewo"><b>希沃导入版</b><small>.pptx · 导入希沃</small></button><button class="${enbx ? 'selected' : ''}" data-action="format" data-value="enbx"><b>希沃原生 <em>试用</em></b><small>.enbx · 原生课件</small></button></div><p class="format-tip">${enbx ? '下载 .enbx 后用希沃白板 5 打开。原生格式为试用功能，请先核对你的版本兼容性。' : seewo ? '下载后，在希沃白板选择「导入课件」，或将文件拖入画布。' : '标准 PPTX，也可以通过希沃白板的「导入课件」打开。'}</p></fieldset><fieldset><legend>页面比例</legend><div class="ratio-options"><button class="${options.ratio === '16:9' ? 'selected' : ''}" data-action="ratio" data-value="16:9"><span class="ratio-icon wide"></span><b>16:9</b><small>宽屏 · 推荐</small></button><button class="${options.ratio === '4:3' ? 'selected' : ''}" data-action="ratio" data-value="4:3"><span class="ratio-icon standard"></span><b>4:3</b><small>传统投影</small></button></div></fieldset><fieldset><legend>课件风格</legend><div class="theme-options">${Object.entries(themes).map(([key, t]) => `<button class="${options.theme === key ? 'selected' : ''}" data-action="theme" data-value="${key}"><span style="background:#${t.background};color:#${t.ink};border-color:#${t.accent}">Aa ${options.theme === key ? icon('check') : ''}</span><small>${t.name}</small></button>`).join('')}</div></fieldset><label class="toggle-row"><div><b>显示题目标题</b><small>${pictureMode ? '将题号标题显示在页面顶部' : '标题在 PPT 中可编辑'}</small></div><input type="checkbox" data-field="headings" ${options.headings ? 'checked' : ''}/><span class="toggle"></span></label><label class="toggle-row"><div><b>留出讲解区域</b><small>每页底部预留思考与板书空间</small></div><input type="checkbox" data-field="blankSpace" ${options.blankSpace ? 'checked' : ''}/><span class="toggle"></span></label></div><div class="export-summary"><span class="export-icon">${icon('presentation')}</span><b>${chosen().length}<small>页课堂课件</small></b><p>每道题，拥有自己的一页。</p><div class="export-summary-detail"><span>试卷页数<strong>${state.pages.length} 页</strong></span><span>导出题目<strong>${chosen().length} 题</strong></span><span>页面比例<strong>${options.ratio}</strong></span><span>文件格式<strong>${enbx ? '.enbx' : '.pptx'}</strong></span></div><div class="export-note">${icon('circle-check')}${enbx ? '希沃白板 5 · 原生 ENBX（试用）' : seewo ? '适用于希沃白板导入' : '支持 PowerPoint 和 WPS'}<br><span>${pictureMode ? '页面按图片保留，可在希沃内添加批注、板书与其他元素。' : '题干以图片保留，方便保留原有排版；复杂 Word 排版请先校对。'}</span></div></div></div><div class="modal-footer"><span>${pictureMode ? '整页以图片保留，文字不可直接编辑' : '题干以图片保留，文字不可直接编辑'}</span><button class="button primary" data-action="export">${icon('download')}${enbx ? '生成并下载 ENBX' : seewo ? '生成并下载希沃课件' : '生成并下载 PPT'}</button></div></section></div>`;
+  const stats = solutionStats(chosen());
+  const solutionPages = options.solutions === 'none' ? 0 : chosen().filter(hasSolution).length;
+  const totalPages = chosen().length + solutionPages;
+  const solutionHint = !stats.answer && !stats.analysis
+    ? '还没有填写答案与解析。请在左侧「当前题目」中填写，或点「答案与解析」批量导入。'
+    : pictureMode && options.solutions === 'reveal'
+      ? '希沃导入版 / 原生课件是整页图片，将按「每题后一页」导出：题目一页、解析一页，翻页即出现。'
+      : options.solutions === 'reveal'
+        ? '解析、答案先隐藏，放映时点击依次出现；PowerPoint / WPS 支持。'
+        : options.solutions === 'paged'
+          ? '每题后面追加一页解析与答案，所有格式通用，翻页即出现。'
+          : '答案与解析不会导出，只生成题目页。';
+  return `<div class="modal-backdrop"><section class="modal export-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">READY FOR YOUR CLASS</span><h2 id="modal-title">最后一步，准备上课。</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><div class="export-layout"><div class="export-form"><label class="form-label">课件名称<input data-field="export-title" value="${esc(options.title)}" maxlength="100" placeholder="例如：七年级数学课堂练习"/></label><fieldset class="format-fieldset"><legend>导出格式</legend><div class="format-options"><button class="${options.format === 'pptx' ? 'selected' : ''}" data-action="format" data-value="pptx"><b>PowerPoint</b><small>.pptx · PowerPoint / WPS</small></button><button class="${seewo ? 'selected' : ''}" data-action="format" data-value="seewo"><b>希沃导入版</b><small>.pptx · 导入希沃</small></button><button class="${enbx ? 'selected' : ''}" data-action="format" data-value="enbx"><b>希沃原生 <em>试用</em></b><small>.enbx · 原生课件</small></button></div><p class="format-tip">${enbx ? '下载 .enbx 后用希沃白板 5 打开。原生格式为试用功能，请先核对你的版本兼容性。' : seewo ? '下载后，在希沃白板选择「导入课件」，或将文件拖入画布。' : '标准 PPTX，也可以通过希沃白板的「导入课件」打开。'}</p></fieldset><fieldset><legend>页面比例</legend><div class="ratio-options"><button class="${options.ratio === '16:9' ? 'selected' : ''}" data-action="ratio" data-value="16:9"><span class="ratio-icon wide"></span><b>16:9</b><small>宽屏 · 推荐</small></button><button class="${options.ratio === '4:3' ? 'selected' : ''}" data-action="ratio" data-value="4:3"><span class="ratio-icon standard"></span><b>4:3</b><small>传统投影</small></button></div></fieldset><fieldset><legend>课件风格</legend><div class="theme-options">${Object.entries(themes).map(([key, t]) => `<button class="${options.theme === key ? 'selected' : ''}" data-action="theme" data-value="${key}"><span style="background:#${t.background};color:#${t.ink};border-color:#${t.accent}">Aa ${options.theme === key ? icon('check') : ''}</span><small>${t.name}</small></button>`).join('')}</div></fieldset><label class="toggle-row"><div><b>显示题目标题</b><small>${pictureMode ? '将题号标题显示在页面顶部' : '标题在 PPT 中可编辑'}</small></div><input type="checkbox" data-field="headings" ${options.headings ? 'checked' : ''}/><span class="toggle"></span></label><label class="toggle-row"><div><b>留出讲解区域</b><small>每页底部预留思考与板书空间</small></div><input type="checkbox" data-field="blankSpace" ${options.blankSpace ? 'checked' : ''}/><span class="toggle"></span></label><fieldset><legend>答案与解析</legend><div class="solution-options"><button class="${options.solutions === 'none' ? 'selected' : ''}" data-action="solutions" data-value="none"><b>不导出</b><small>只生成题目页</small></button><button class="${options.solutions === 'reveal' ? 'selected' : ''}" data-action="solutions" data-value="reveal"><b>同页点击出现</b><small>PowerPoint / WPS</small></button><button class="${options.solutions === 'paged' ? 'selected' : ''}" data-action="solutions" data-value="paged"><b>每题后一页</b><small>三种格式通用</small></button></div><p class="format-tip">${solutionHint}</p><p class="solution-summary">已填写 ${stats.answer} 题答案 · ${stats.analysis} 题解析 · 本课件共 ${totalPages} 页</p></fieldset></div><div class="export-summary"><span class="export-icon">${icon('presentation')}</span><b>${totalPages}<small>页课堂课件</small></b><p>每道题，拥有自己的一页${solutionPages ? '；解析按设置出现' : ''}。</p><div class="export-summary-detail"><span>试卷页数<strong>${state.pages.length} 页</strong></span><span>导出题目<strong>${chosen().length} 题</strong></span><span>解析页<strong>${solutionPages} 页</strong></span><span>页面比例<strong>${options.ratio}</strong></span><span>文件格式<strong>${enbx ? '.enbx' : '.pptx'}</strong></span></div><div class="export-note">${icon('circle-check')}${enbx ? '希沃白板 5 · 原生 ENBX（试用）' : seewo ? '适用于希沃白板导入' : '支持 PowerPoint 和 WPS'}<br><span>${pictureMode ? '页面按图片保留，可在希沃内添加批注、板书与其他元素。' : '题干以图片保留，方便保留原有排版；复杂 Word 排版请先校对。'}</span></div></div></div><div class="modal-footer"><span>${pictureMode ? '整页以图片保留，文字不可直接编辑' : '题干以图片保留，文字不可直接编辑'}</span><button class="button primary" data-action="export">${icon('download')}${enbx ? '生成并下载 ENBX' : seewo ? '生成并下载希沃课件' : '生成并下载 PPT'}</button></div></section></div>`;
 }
 function helpModal() {
-  return `<div class="modal-backdrop"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><h2 id="modal-title">从试卷，到每一页课堂</h2><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><ol class="help-steps"><li><b>导入 PDF 或 Word</b><p>支持文字 PDF、扫描 PDF、Word .docx。旧版 .doc 请先另存为 .docx。一次最多 60 MB、60 页。</p></li><li><b>确认题目的拆分</b><p>支持「1.」「1、」「第1题」等题号。双栏试卷请切换版式。扫描件点击 OCR，或使用框选模式手动添加题目。</p></li><li><b>调整选框与题目顺序</b><p>选中后拖动选框移动，拖右下角缩放。跨页题目可以用「合并下一题」，多余部分可以拆分或删除。工具栏支持撤销。</p></li><li><b>选择风格并下载课件</b><p>每道已勾选的题目生成一页。支持 PowerPoint、希沃导入版 PPTX 和希沃原生 ENBX（试用）。PowerPoint 标题可编辑；两种希沃模式均整页以图片保留，可以在希沃内添加批注与板书。长题可能缩得较小，可拆分改善可读性。</p></li></ol><div class="help-note">所有试卷处理都在浏览器本地完成，不上传试卷。刷新页面会清空当前工作，请及时导出。DOCX 的复杂浮动排版、特殊字体或公式可能与 Word 不同，建议先转成 PDF 以保留原样。</div><div class="example-downloads"><a href="/examples/数学示例试卷.pdf" download>下载示例 PDF ↗</a><a href="/examples/数学示例试卷.docx" download>下载示例 Word ↗</a></div><button class="button primary" data-action="close">开始备课${icon('arrow-right')}</button></section></div>`;
+  return `<div class="modal-backdrop"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><h2 id="modal-title">从试卷，到每一页课堂</h2><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><ol class="help-steps"><li><b>导入 PDF 或 Word</b><p>支持文字 PDF、扫描 PDF、Word .docx。旧版 .doc 请先另存为 .docx。一次最多 60 MB、60 页。</p></li><li><b>确认题目的拆分</b><p>支持「1.」「1、」「第1题」等题号。双栏试卷请切换版式。扫描件点击 OCR，或使用框选模式手动添加题目。</p></li><li><b>调整选框与题目顺序</b><p>选中后拖动选框移动，拖右下角缩放。跨页题目可以用「合并下一题」，多余部分可以拆分或删除。工具栏支持撤销。</p></li><li><b>选择风格并下载课件</b><p>每道已勾选的题目生成一页。支持 PowerPoint、希沃导入版 PPTX 和希沃原生 ENBX（试用）。PowerPoint 标题可编辑；两种希沃模式均整页以图片保留，可以在希沃内添加批注与板书。长题可能缩得较小，可拆分改善可读性。</p></li></ol><div class="help-note">需要讲解答案时，先在「答案与解析」里逐题填写或批量粘贴（也可以导入导出的 JSON）。导出设置可选「同页点击出现」（PowerPoint / WPS：解析、答案放完后点击依次出现）或「每题后一页」（三种格式通用）。答案只在本页内存中，不上传。刷新页面会清空，请及时导出 JSON 备份。</div><div class="help-note">所有试卷处理都在浏览器本地完成，不上传试卷。刷新页面会清空当前工作，请及时导出。DOCX 的复杂浮动排版、特殊字体或公式可能与 Word 不同，建议先转成 PDF 以保留原样。</div><div class="example-downloads"><a href="/examples/数学示例试卷.pdf" download>下载示例 PDF ↗</a><a href="/examples/数学示例试卷.docx" download>下载示例 Word ↗</a></div><button class="button primary" data-action="close">开始备课${icon('arrow-right')}</button></section></div>`;
+}
+function answersModal() {
+  const stats = solutionStats(state.questions);
+  return `<div class="modal-backdrop"><section class="modal answers-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">ANSWER & EXPLANATION</span><h2 id="modal-title">把答案与解析放进课件</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><p class="answers-intro">答案与解析只保存在本页内存中，不上传、不联网。导入后可在左侧逐题修改；导出时默认隐藏，按设置点击出现。刷新页面会清空，请及时导出 JSON 备份。</p><div class="answers-stats"><span>共 <b>${stats.total}</b> 题</span><span>已填答案 <b>${stats.answer}</b></span><span>已填解析 <b>${stats.analysis}</b></span></div><label class="form-label">批量粘贴<textarea id="answers-text" rows="9" placeholder="1. 答案：D&#10;解析：因为……&#10;&#10;2. 答案：x₁=1，x₂=-5&#10;解析：……"></textarea></label><details class="answers-format"><summary>支持的粘贴格式</summary><pre>1. 答案：D
+解析：因为……
+
+2. 答案：x₁=1，x₂=-5
+解析：……
+
+第 3 题 答案：4√3
+解析：……</pre><p>题号与试卷拆分出的题号对应；没有题号时按题目顺序匹配。</p></details><div class="answers-actions"><button class="button secondary" data-action="answers-json">${icon('upload')}导入 JSON</button><button class="button secondary" data-action="answers-template">${icon('download')}导出当前答案</button><button class="button primary" data-action="apply-answers">${icon('check')}导入粘贴内容</button></div></section></div>`;
 }
 function render() {
   const paperScroll = document.querySelector('.paper-scroll')?.scrollTop || 0;
   const listScroll = document.querySelector('.question-list')?.scrollTop || 0;
-  app.innerHTML = `<div class="app-shell">${sidebar()}<main>${header()}${state.file ? workspace() : emptyState()}</main></div><input id="file-input" type="file" accept=".pdf,.docx,.doc" hidden/>${state.modal === 'settings' ? settingsModal() : state.modal === 'help' ? helpModal() : ''}${state.busy ? `<div class="busy-overlay" role="alert" aria-busy="true"><div class="busy-card"><span class="busy-spinner"></span><h3 id="progress-label">${esc(state.message)}</h3><p>文件在本机处理，请稍等片刻</p><div class="progress-track"><div id="progress-bar" style="width:${state.progress * 100}%"></div></div></div></div>` : ''}`;
+  app.innerHTML = `<div class="app-shell">${sidebar()}<main>${header()}${state.file ? workspace() : emptyState()}</main></div><input id="file-input" type="file" accept=".pdf,.docx,.doc" hidden/><input id="answers-input" type="file" accept=".json,.txt,application/json,text/plain" hidden/>${state.modal === 'settings' ? settingsModal() : state.modal === 'help' ? helpModal() : state.modal === 'answers' ? answersModal() : ''}${state.busy ? `<div class="busy-overlay" role="alert" aria-busy="true"><div class="busy-card"><span class="busy-spinner"></span><h3 id="progress-label">${esc(state.message)}</h3><p>文件在本机处理，请稍等片刻</p><div class="progress-track"><div id="progress-bar" style="width:${state.progress * 100}%"></div></div></div></div>` : ''}`;
   app.querySelectorAll('a[href^="/examples/"]').forEach(link => {
     const source = link.getAttribute('href');
     link.href = resourceURL(source);
@@ -106,6 +130,8 @@ function render() {
   if (paper) paper.scrollTop = paperScroll;
   const list = document.querySelector('.question-list');
   if (list) list.scrollTop = listScroll;
+  const answers = document.getElementById('answers-text');
+  if (answers && state.answerDraft) answers.value = state.answerDraft;
 }
 
 async function importFile(file) {
@@ -172,6 +198,48 @@ async function runOCR() {
     toast('OCR 未能完成。可以直接框选题目，或稍后重新识别。');
   } finally {state.busy = false; render();}
 }
+function applyAnswerText(text) {
+  const entries = parseSolutionsText(text);
+  if (!entries.length) {toast('没有识别到「题号 + 答案 / 解析」，请按示例格式粘贴'); return;}
+  snapshot();
+  const applied = applySolutions(state.questions, entries);
+  if (!applied) {toast('答案中的题号与当前试卷不匹配'); return;}
+  if (state.options.solutions === 'none') state.options.solutions = 'reveal';
+  state.modal = null;
+  state.answerDraft = '';
+  render();
+  toast(`已导入 ${applied} 题的答案与解析`);
+}
+async function readAnswersFile(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const entries = file.name.toLowerCase().endsWith('.json') ? parseSolutionsJSON(text) : parseSolutionsText(text);
+    if (!entries.length) throw new Error('文件里没有可用的答案或解析');
+    snapshot();
+    const applied = applySolutions(state.questions, entries);
+    if (!applied) throw new Error('答案中的题号与当前试卷不匹配');
+    if (state.options.solutions === 'none') state.options.solutions = 'reveal';
+    state.modal = null;
+    state.answerDraft = '';
+    render();
+    toast(`已导入 ${applied} 题的答案与解析`);
+  } catch (e) {console.error(e); toast(e.message || '答案文件读取失败，请确认是导出的 JSON 或文本格式');}
+}
+function downloadAnswers() {
+  const data = buildSolutionExport(state.questions, state.options.title || '');
+  if (!data.questions.length) {toast('还没有填写答案或解析'); return;}
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
+  const name = (state.options.title || '试卷').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${name}-答案与解析.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  toast(`已导出 ${data.questions.length} 题的答案与解析`);
+}
 async function download() {
   if (!chosen().length || state.busy) return;
   state.busy = true;
@@ -219,12 +287,17 @@ app.addEventListener('click', event => {
     case 'select': state.selected = button.dataset.id; state.page = selectedQuestion().segments[0].page; break;
     case 'resplit': resplit(); return;
     case 'ocr': runOCR(); return;
+    case 'answers': state.modal = 'answers'; break;
+    case 'apply-answers': applyAnswerText(document.getElementById('answers-text')?.value || ''); return;
+    case 'answers-json': document.getElementById('answers-input').click(); return;
+    case 'answers-template': downloadAnswers(); return;
+    case 'solutions': state.options.solutions = button.dataset.value; break;
     case 'undo': if (state.history.length) {state.questions = JSON.parse(state.history.pop()); state.selected = state.questions[0]?.id || null;} break;
     case 'all': {snapshot(); const include = chosen().length !== state.questions.length; state.questions.forEach(item => item.included = include); break;}
     case 'delete': if (q) {snapshot(); state.questions.splice(index, 1); state.selected = state.questions[Math.min(index, state.questions.length - 1)]?.id || null;} break;
     case 'up': case 'down': {const other = index + (action === 'up' ? -1 : 1); if (q && other >= 0 && other < state.questions.length) {snapshot(); [state.questions[index], state.questions[other]] = [state.questions[other], state.questions[index]];} break;}
     case 'merge': if (q && index < state.questions.length - 1) {snapshot(); q.segments.push(...state.questions[index + 1].segments); q.text += ` ${state.questions[index + 1].text || ''}`; state.questions.splice(index + 1, 1); toast('已合并，多个片段将出现在同一页 PPT');} break;
-    case 'split': if (q) {snapshot(); const [first, second] = splitQuestion(q); q.segments = first; state.questions.splice(index + 1, 0, {...q, id: uid(), title: `${q.title}（续）`, segments: second}); toast('已从中间拆分，可拖动选框进一步调整');} break;
+    case 'split': if (q) {snapshot(); const [first, second] = splitQuestion(q); q.segments = first; state.questions.splice(index + 1, 0, {...q, id: uid(), title: `${q.title}（续）`, segments: second, answer: '', analysis: ''}); toast('已从中间拆分，可拖动选框进一步调整');} break;
     case 'format': state.options.format = button.dataset.value; break;
     case 'theme': state.options.theme = button.dataset.value; break;
     case 'ratio': state.options.ratio = button.dataset.value; break;
@@ -243,6 +316,7 @@ app.addEventListener('click', event => {
 app.addEventListener('change', event => {
   const el = event.target;
   if (el.id === 'file-input') {importFile(el.files[0]); return;}
+  if (el.id === 'answers-input') {readAnswersFile(el.files[0]); el.value = ''; return;}
   if (state.busy) return;
   const q = selectedQuestion();
   switch (el.dataset.field) {
@@ -257,7 +331,16 @@ app.addEventListener('change', event => {
   render();
 });
 // Keep the export name current without re-rendering while typing.
-app.addEventListener('input', event => {if (event.target.dataset.field === 'export-title') state.options.title = event.target.value;});
+app.addEventListener('input', event => {
+  const field = event.target.dataset.field;
+  if (field === 'export-title') {state.options.title = event.target.value; return;}
+  if (field === 'question-answer' || field === 'question-analysis') {
+    const q = selectedQuestion();
+    if (q) q[field === 'question-answer' ? 'answer' : 'analysis'] = event.target.value;
+    return;
+  }
+  if (event.target.id === 'answers-text') state.answerDraft = event.target.value;
+});
 app.addEventListener('dragover', event => {event.preventDefault(); if (!state.busy) document.getElementById('drop-zone')?.classList.add('drag-over');});
 app.addEventListener('dragleave', event => {if (!event.relatedTarget || !app.contains(event.relatedTarget)) document.getElementById('drop-zone')?.classList.remove('drag-over');});
 app.addEventListener('drop', event => {event.preventDefault(); document.getElementById('drop-zone')?.classList.remove('drag-over'); if (!state.busy) importFile(event.dataTransfer.files[0]);});
@@ -305,7 +388,7 @@ function finishDrag() {
     const w = Math.abs(d.end.x - d.start.x), h = Math.abs(d.end.y - d.start.y);
     if (w > 0.025 && h > 0.01) {
       snapshot();
-      const q = {id: uid(), title: `第 ${state.questions.length + 1} 题`, text: '', included: true, segments: [{page: state.page, x: Math.min(d.start.x, d.end.x), y: Math.min(d.start.y, d.end.y), w, h}]};
+      const q = {id: uid(), title: `第 ${state.questions.length + 1} 题`, text: '', included: true, answer: '', analysis: '', segments: [{page: state.page, x: Math.min(d.start.x, d.end.x), y: Math.min(d.start.y, d.end.y), w, h}]};
       state.questions.push(q);
       state.selected = q.id;
       state.mode = 'select';

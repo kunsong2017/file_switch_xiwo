@@ -14,23 +14,25 @@
     "src/document.js": "e8400a801ebfe87f9ab7335b848683e3993eea69a813d68c3fc9fd109d491682",
     "src/enbx-metadata.xml": "8d3651918617f391f2e5e3b6da1829d476d6b6fdd48487878cb2396d67677549",
     "src/enbx-package.js": "ff14ee614ddc497e305b6656ebc8e1c3967b5a39313f61d28331085898ff5f02",
-    "src/enbx.js": "d3244d6fc3d36f84cbf67f421aa5db2dc57ddb9bb498c2d183deafe5f42eb015",
-    "src/export.js": "db2938c565a03c40d009e8d395ce40a9480e69c7e3d31d3c2307973fdb112e50",
+    "src/enbx.js": "9c4fddd0791f057dd666fafc929c5beb381125336c3d2ec0ed162604f7a41e31",
+    "src/export.js": "accad2eb503f7819eecd075e1bd6bd57b4881d2002862fdbd74c2d969349dbd5",
     "src/figure-seam.js": "2357e82f012b4393488c437e014e0bfffbf94b857981bdef206d624feaa18f1b",
     "src/layout.js": "c9ca5a33e81a1f13f5882e02cd70baa64068593351882baaadedb0827db9583e",
-    "src/main.js": "8c8470c27464563fd50e63dd1877cb90be607d4fa9fda1221e00d5b03be7a754",
+    "src/main.js": "61656e96ab9fff659a1f116c09dae7ede17b5ecd53a6cfbc4fa171c583711637",
     "src/math.js": "621d45d56f94dcae017ad007a25c95941a2d427687cb9b42a6d05b30a1e6734a",
     "src/offline.js": "40d608d9b996a8aa183efd79a8899d5937b2e56be5dba7466651aeacaa565534",
     "src/pdf-graphics.js": "8cc791dd438cfb8a6c55bbf92199676041caaba09fad8490371adefda18015e0",
     "src/raster-graphics.js": "d8909446becb5f714b6e38bef6a793369c2b286738f2d869ec8d310a06e478b4",
-    "src/seewo.js": "a5bb6ac38589459dc664ed0a39d72bd8fab95d2611190453ed1469e213f4a75a",
-    "src/segment.js": "24c095cbc2a57f0a9cc1618af5cf718fda44e6f3af00a78161b026c449895934",
-    "src/style.css": "dccd2b5ff328f3f5c53bfc3b8477acd2615ff57453c6b1adca53bfeb5aa56c67",
+    "src/reveal.js": "4e445f01ed7cbffc3aff11307d78d0522a49b4db17c527b0a4bc2c47678138b0",
+    "src/seewo.js": "400e1de500a86d8a8a89a9de551a8b1db0426cc837edbd3110c0c7bd37c150dd",
+    "src/segment.js": "dee9ba99b251e721049c099ff2d46456807c29227ffcf5a4078e6f6008caabad",
+    "src/solutions.js": "5b53e2a9a2d56068c1343fc6039dfed1805af13bdc3e447c3ffe8eef85b20b34",
+    "src/style.css": "a9af90dc6e030a5634b6bb0d150ec3f4066e90141debdaa3eef6bbfeb4641929",
     "third_party/OpenEnow.JS/LICENSE": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
-    "使用前先看.txt": "d679b5821deb9c3c5374cd5914d1b7606ecba5a5b32862d137181abeede1c968"
+    "使用前先看.txt": "ff9a21ef1a7174adace66e1f586c12a18fbeb0e28197a2a2e155258e95545728"
   },
   "files": {
-    "offline/index.html": "62907a70deb708ca3be299b8cb892f5007b1652a6590a7d1ce6bb734503cd05d",
+    "offline/index.html": "3c5765e27ef1e8df51b1a7b677ccc17f42ad76788a1784c9dee48782272ecaf9",
     "offline/licenses/OpenEnow.JS-MIT.txt": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
     "offline/licenses/docx-preview-LICENSE": "8668bf4417d161e4eb4d47d6044526e4914d9eb3c748573d9bb7e87708c1253f",
     "offline/licenses/html-to-image-LICENSE": "9fe73723f7a9e91057f73aafc9b6a3c3b2174db2b3ddc0a3a6a8ddf2bad68e37",
@@ -50,6 +52,6 @@
     "offline/licenses/tessdata_fast-Apache-2.0.txt": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
     "offline/licenses/tesseract.js-LICENSE.md": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
     "offline/licenses/tesseract.js-core-LICENSE": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
-    "offline/使用前先看.txt": "d679b5821deb9c3c5374cd5914d1b7606ecba5a5b32862d137181abeede1c968"
+    "offline/使用前先看.txt": "ff9a21ef1a7174adace66e1f586c12a18fbeb0e28197a2a2e155258e95545728"
   }
 }

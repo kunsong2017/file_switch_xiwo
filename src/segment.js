@@ -75,6 +75,8 @@ export function segmentPages(pages, columns = 1) {
           number: questionNumber(line.text, true),
           text: line.text,
           included: true,
+          answer: '',
+          analysis: '',
           segments: [normalizeCrop({page: pi, x, y, w, h: end - y, anchorY:line.y})]
         };
         questions.push(previous);

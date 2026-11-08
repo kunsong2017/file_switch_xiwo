@@ -118,6 +118,46 @@ try {
       else assert.equal(zip.file(/^ppt\/slides\/slide\d+\.xml$/).length,sample.count);
       console.log(`PASS ${sample.key} ${format}: ${sample.count} complete slides`);
     }
+    // 答案与解析：解析 / 答案先隐藏；PPTX 同页点击出现，希沃两种格式按每题后一页。
+    const solutionFile=sample.key==='exam2'?'tests/solutions/期中综合复习2.json':'tests/solutions/复习卷6.json';
+    const solutionData=JSON.parse(await readFile(solutionFile,'utf8'));
+    const applied=await page.evaluate(async entries=>{
+      const {applySolutions}=await import('/src/solutions.js');
+      return applySolutions(globalThis.examRegression.questions,entries);
+    },solutionData.questions);
+    assert.equal(applied,sample.count,`${sample.file}: every question matched an answer`);
+    const scenarios=[
+      {format:'pptx',solutions:'reveal',pages:sample.count},
+      {format:'pptx',solutions:'paged',pages:sample.count*2},
+      {format:'seewo',solutions:'paged',pages:sample.count*2},
+      {format:'enbx',solutions:'paged',pages:sample.count*2},
+    ];
+    for(const scenario of scenarios) {
+      const pending=page.waitForEvent('download',{timeout:180000});
+      await page.evaluate(async ({format,solutions})=>{
+        const {questions,pages,options}=globalThis.examRegression;
+        const module=await import(format==='enbx'?'/src/enbx.js':format==='seewo'?'/src/seewo.js':'/src/export.js');
+        await (module.exportENBX || module.exportSeewoPPTX || module.exportPPTX)(questions,pages,{...options,solutions},()=>{});
+      },scenario);
+      const file=await pending,target=`test-results/real-exams/${sample.key}-${scenario.format}-${scenario.solutions}.${scenario.format==='enbx'?'enbx':'pptx'}`;
+      await file.saveAs(target);
+      const zip=await JSZip.loadAsync(await readFile(target));
+      if(scenario.format==='enbx') await validateENBX(zip,scenario.pages,{width:3200,height:1800});
+      else {
+        const slides=zip.file(/^ppt\/slides\/slide\d+\.xml$/).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+        assert.equal(slides.length,scenario.pages,`${sample.key} ${scenario.format}/${scenario.solutions} slide count`);
+        if(scenario.solutions==='reveal') {
+          for(const [index,entry] of slides.entries()) {
+            const xml=await entry.async('string');
+            assert.match(xml,/<p:timing>/,`${sample.key} slide ${index+1} has timing`);
+            assert.ok(xml.indexOf('<p:timing>')<xml.indexOf('</p:sld>'));
+            assert.equal((xml.match(/nodeType="clickEffect"/g)||[]).length,2,`${sample.key} slide ${index+1}: 解析、答案依次点击出现`);
+            assert.equal((xml.match(/presetClass="entr"/g)||[]).length,2);
+          }
+        }
+      }
+      console.log(`PASS ${sample.key} ${scenario.format}/${scenario.solutions}: ${scenario.pages} slides with solutions`);
+    }
     await page.evaluate(()=>{examRegression.pages.forEach(p=>p.canvas.width=0);delete globalThis.examRegression;});
   }
   assert.deepEqual(errors,[]);

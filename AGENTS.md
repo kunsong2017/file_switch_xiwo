@@ -5,6 +5,8 @@
 - 功能入口：`src/main.js`；文档读取：`src/document.js`；分题：`src/segment.js`。
 - PowerPoint 导出：`src/export.js`；希沃导入版：`src/seewo.js`；原生 ENBX：`src/enbx.js` / `src/enbx-package.js`。
 - 希沃导入版为 `.pptx`；原生 `.enbx` 必须生成包含 XML、资源关系及图片的实际课件包，不得只改扩展名。两者均整页图片。不得声称已通过未执行的希沃客户端验证。
+- 答案与解析：数据在 `src/solutions.js`（纯函数，Node 可直接测），点击动画在 `src/reveal.js`（生成后向 slide XML 注入 `<p:timing>`）。希沃两种格式只能分页显示；同页点击只用于 PowerPoint 导出。不得声称已在真实 PowerPoint / WPS 客户端验证动画放映效果。
+- `tests/solutions/` 是两份用户真卷的人工参考解答，改动分题或题号时同步核对；`npm run test:exams` 会导入它们并检查每页两次点击动画。
 - ENBX 改动先运行 `npm test` 和 `npm run test:browser`，再运行 `npm run test:enbx`，用独立读取器检查浏览器下载的原生文件。
 - 安装并构建：`npm ci` → `npm run assets` → `python3 scripts/download-languages.py` → `npm run build`。
 - 单元测试：`npm test`；启动静态服务后运行 `npm run test:browser` 和 `npm run test:ocr`。

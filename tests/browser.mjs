@@ -76,6 +76,36 @@ try {
   const dataURL = await page.locator('.paper-image').getAttribute('src');
   await writeFile(path.join(results,'sample-page.png'),Buffer.from(dataURL.split(',')[1],'base64'));
   await download('pdf-six-questions.pptx',6);
+  // 答案与解析：批量粘贴 → 逐题标记 → 同页点击出现
+  await page.locator('[data-action="answers"]').click();
+  await page.locator('#answers-text').fill(['1. 答案：D\n解析：解析一','2. 答案：B\n解析：解析二','3. 答案：C\n解析：解析三','4. 答案：A\n解析：解析四','5. 答案：B\n解析：解析五','6. 答案：C\n解析：解析六'].join('\n\n'));
+  await page.locator('[data-action="apply-answers"]').click();
+  await page.locator('.solution-badge').first().waitFor();
+  assert.equal(await page.locator('.solution-badge').count(),6,'every question shows an answer badge');
+  await page.locator('[data-action="answers"]').click();
+  assert.match(await page.locator('.answers-stats').textContent(),/已填答案\s*6/);
+  await page.locator('[data-action="close"]').first().click();
+  await page.locator('[data-action="settings"]').first().click();
+  await page.locator('[data-action="solutions"][data-value="reveal"]').click();
+  const solutionPending = page.waitForEvent('download');
+  await page.locator('[data-action="export"]').click();
+  const solutionFile = await solutionPending;
+  const solutionTarget = path.join(results,'pdf-six-questions-reveal.pptx');
+  await solutionFile.saveAs(solutionTarget);
+  await settle();
+  const solutionZip = await JSZip.loadAsync(await readFile(solutionTarget));
+  const solutionSlides = Object.keys(solutionZip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+  assert.equal(solutionSlides.length,6,'reveal export keeps one slide per question');
+  for(const slide of solutionSlides) {
+    const xml = await solutionZip.file(slide).async('string');
+    assert.match(xml,/<p:timing>/);
+    assert.equal((xml.match(/nodeType="clickEffect"/g)||[]).length,2,`${slide}: analysis then answer reveal on click`);
+  }
+  console.log('PASS answers: paste import, badges, and two click-triggered reveals per slide');
+  // 后续导出按原来的「不导出答案」设置继续回归。
+  await page.locator('[data-action="settings"]').first().click();
+  await page.locator('[data-action="solutions"][data-value="none"]').click();
+  await page.locator('[data-action="close"]').click();
   await download('seewo-pdf-six-questions.pptx',6,'seewo');
   await download('native-pdf-six-questions.enbx',6,'enbx');
   await page.locator('[data-action="split"]').click();

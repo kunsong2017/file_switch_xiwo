@@ -1,5 +1,18 @@
 # 验证记录
 
+## 2026-11-08：答案与解析、PPT 同页点击出现
+
+- 每道题新增「答案」「解析」两个字段：左侧「当前题目」逐题填写；「答案与解析」窗口支持批量粘贴、JSON 导入 / 导出。答案由老师提供或导入，工具不联网、不调用模型，试卷仍只在浏览器本地处理。
+- PowerPoint 导出新增「同页点击出现」：解析面板与答案条先生成形状，再由 `src/reveal.js` 向 `ppt/slides/slideN.xml` 注入标准 `<p:timing>`（`presetID=1`、`presetClass="entr"`、`nodeType="clickEffect"`，`style.visibility` → `visible`），每页两段点击：先解析、后答案。仅 PowerPoint / WPS 导出使用；希沃导入版与原生 ENBX 是整页图片，自动退回「每题后一页」。
+- 两份真卷导入 `tests/solutions/` 的 27 / 26 题人工解答后实际导出并检查：
+  - 同页点击版 27 / 26 页；分页版 PPTX 与希沃导入版 54 / 52 页；原生 ENBX 54 / 52 页，并通过独立 OpenEnow.JS 读取器与打包校验。
+  - 逐页解析 slide XML：存在 `<p:timing>`、两段 `clickEffect`、位置在 `</p:sld>` 之前；形状名 `sol-analysis-N` / `sol-answer-N` 与 `spid` 对应。
+  - 分页版第 1 题解析页检查题目图片、解析面板与答案条排版正常。
+- LibreOffice Impress 打开并转 PDF：点击版 27 页、分页版 54 页，无修复提示。截图检查解析面板与答案条。
+- 单元测试新增 `tests/solutions.test.mjs`：文本 / JSON 解析、按题号匹配、导入导出往返、两份真卷覆盖 1～27 / 1～26、时间轴 XML 结构与形状 id 查找。
+- **未在真实 Microsoft PowerPoint / WPS 中放映验证点击动画，未在希沃客户端验证。** 界面与文档不声称已完成这些验收。
+- 边界：答案解析为纯文字（不支持公式排版）；答案只在内存中，刷新清空，需及时导出 JSON；同页点击动画依赖 PowerPoint 的标准时间轴，其他阅读器可能忽略。
+
 ## 2026-11-06：用户真卷、题图匹配和原生裁剪修复
 
 基线为用户上传两份 PDF 的 `3e1ca59`。实际文件名为 `tests/初三数学期中综合复习2.pdf` 和 `tests/初三数学复习卷 6.pdf`（后者含空格）。
