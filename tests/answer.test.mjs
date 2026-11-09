@@ -63,9 +63,18 @@ test('错误响应与网络错误给出可读提示', async () => {
   );
 });
 
-test('免费模型预设齐全', () => {
+test('模型预设齐全', () => {
+  assert.equal(providerById('deepseek').model, 'deepseek-flash');
+  assert.equal(providerById('deepseek').via, 'direct');
+  assert.match(providerById('deepseek').base, /api\.deepseek\.com/);
   assert.equal(providerById('zhipu').model, 'glm-4v-flash');
   assert.equal(providerById('zhipu').via, 'proxy');
   assert.equal(providerById('qwen').via, 'direct');
   assert.ok(answerProviders.every(p => p.name && p.note));
+});
+
+test('DeepSeek 预设发送图片而不是纯文本', () => {
+  const body = buildAnswerRequest({provider: providerById('deepseek'), dataUrl});
+  assert.equal(body.model, 'deepseek-flash');
+  assert.deepEqual(body.messages[0].content.map(part => part.type), ['text', 'image_url']);
 });

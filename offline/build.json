@@ -11,7 +11,7 @@
     "scripts/check-offline.mjs": "225492fa8127e6dca7956f90a50e2f9bc8f8897b21070e833266a16b251a9fdf",
     "scripts/download-languages.py": "c3c72e8776acbeeff8d529da6ab2e105b259750056278e8b1244555720f7da68",
     "scripts/prepare-assets.mjs": "b200ee4e13b56a4414f84e6fc43955e3c54f248cb8a9520250fbd3035f80383c",
-    "src/answer.js": "5cc9939ecefadd8880d826c3bc5320b9fd018c015fc4f0e7b6112c46c9ffbcde",
+    "src/answer.js": "8b452c71e0e665101e65326a6f63981da66b57edbcd990f1651e81c9c130e123",
     "src/document.js": "e8400a801ebfe87f9ab7335b848683e3993eea69a813d68c3fc9fd109d491682",
     "src/enbx-metadata.xml": "8d3651918617f391f2e5e3b6da1829d476d6b6fdd48487878cb2396d67677549",
     "src/enbx-package.js": "ff14ee614ddc497e305b6656ebc8e1c3967b5a39313f61d28331085898ff5f02",
@@ -30,10 +30,10 @@
     "src/solutions.js": "5b53e2a9a2d56068c1343fc6039dfed1805af13bdc3e447c3ffe8eef85b20b34",
     "src/style.css": "d894a35f1b680b66d492db7b341f9665b5e4ce94144bc05e5ee169dc5be90e8f",
     "third_party/OpenEnow.JS/LICENSE": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
-    "使用前先看.txt": "3c55be99279da21702a0ad0ebae2ab7e0f99063872d6f9ee1470a2fa78efa7ea"
+    "使用前先看.txt": "217a5ff4b934052823e7e4b1905d19cfab9a68db143f7164c7b015a53f5785f7"
   },
   "files": {
-    "offline/index.html": "2bd1f0621f6c688031f8220abbc887c79f10b3842293a2ca151affe16e34e57f",
+    "offline/index.html": "95c1de7faa9a58cbedd9b59f3bda8d0f5f9473d647272cc3665489daf3884200",
     "offline/licenses/OpenEnow.JS-MIT.txt": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
     "offline/licenses/docx-preview-LICENSE": "8668bf4417d161e4eb4d47d6044526e4914d9eb3c748573d9bb7e87708c1253f",
     "offline/licenses/html-to-image-LICENSE": "9fe73723f7a9e91057f73aafc9b6a3c3b2174db2b3ddc0a3a6a8ddf2bad68e37",
@@ -53,6 +53,6 @@
     "offline/licenses/tessdata_fast-Apache-2.0.txt": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
     "offline/licenses/tesseract.js-LICENSE.md": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
     "offline/licenses/tesseract.js-core-LICENSE": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
-    "offline/使用前先看.txt": "3c55be99279da21702a0ad0ebae2ab7e0f99063872d6f9ee1470a2fa78efa7ea"
+    "offline/使用前先看.txt": "217a5ff4b934052823e7e4b1905d19cfab9a68db143f7164c7b015a53f5785f7"
   }
 }

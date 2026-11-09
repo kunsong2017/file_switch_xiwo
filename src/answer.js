@@ -3,6 +3,14 @@
 
 export const answerProviders = [
   {
+    id: 'deepseek',
+    name: 'DeepSeek（deepseek-flash）',
+    base: 'https://api.deepseek.com/chat/completions',
+    model: 'deepseek-flash',
+    via: 'direct',
+    note: '官方接口支持图片（image_url / base64），浏览器可直连；按 Flash 价格计费，不是免费模型。',
+  },
+  {
     id: 'zhipu',
     name: '智谱 GLM-4V-Flash',
     base: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
