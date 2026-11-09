@@ -3,8 +3,11 @@ import {createIcons, FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus,
 import {readDocument, recognizePages} from './document.js';
 import {segmentPages, normalizeCrop, splitQuestion, clamp} from './segment.js';
 import {composeQuestion, exportPPTX, themes} from './export.js';
-import {parseSolutionsText, parseSolutionsJSON, applySolutions, buildSolutionExport, solutionStats, hasSolution} from './solutions.js';
-import {answerProviders, providerById, solveQuestion} from './answer.js';
+import {parseSolutionsText, parseSolutionsJSON, applySolutions, buildSolutionExport, solutionStats, hasSolution, preserveSolutions} from './solutions.js';
+import {answerProviders, providerById, solveQuestion, answerTokenBudget, isUncertainSolution, acceptAutoSolution} from './answer.js';
+import {browserCredentialStore, credentialScope} from './credentials.js';
+import {exportPageCount} from './solution-layout.js';
+import {prepareQuestionImages} from './answer-image.js';
 import {resourceURL} from './offline.js';
 
 const app = document.getElementById('app');
@@ -12,6 +15,15 @@ const iconSet = {FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus, X, 
 const icon = name => `<i data-lucide="${name}"></i>`;
 const esc = str => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false, solutions: 'none'}, auto: {preset: 'deepseek', base: 'https://api.deepseek.com/chat/completions', model: 'deepseek-flash', key: '', proxy: 'http://127.0.0.1:5199/api/answer', overwrite: false}};
+const credentialStore=browserCredentialStore();
+state.auto=credentialStore.restore(state.auto);
+const isAutoComplete=q=>!isUncertainSolution(q) && Boolean((q.analysis || '').trim()) && q.autoResult?.status!=='unresolved';
+function saveCredential() {
+  if(!credentialStore.save(state.auto) && state.auto.remember) {
+    state.auto.remember=false;
+    toast('浏览器不允许本地保存，Key 仅在本次打开期间使用');
+  }
+}
 let toastTimer;
 let drag = null;
 const cache = new Map();
@@ -90,11 +102,10 @@ function settingsModal() {
   const enbx = options.format === 'enbx';
   const pictureMode = seewo || enbx;
   const stats = solutionStats(chosen());
-  const solvedCount = chosen().filter(hasSolution).length;
   // 同页点击是一题一页；希沃两种格式会退回每题后一页，页数按分页算。
   const paged = options.solutions === 'paged' || (pictureMode && options.solutions === 'reveal');
-  const solutionPages = paged ? solvedCount : 0;
-  const totalPages = chosen().length + solutionPages;
+  const totalPages = exportPageCount(state.questions,options);
+  const solutionPages = totalPages-chosen().length;
   const solutionHint = !stats.answer && !stats.analysis
     ? '还没有填写答案与解析。请在左侧「当前题目」中填写，或点「答案与解析」批量导入。'
     : pictureMode && options.solutions === 'reveal'
@@ -121,13 +132,46 @@ function answersModal() {
 解析：……</pre><p>题号与试卷拆分出的题号对应；没有题号时按题目顺序匹配。</p></details><div class="answers-actions"><button class="button secondary" data-action="answers-json">${icon('upload')}导入 JSON</button><button class="button secondary" data-action="answers-template">${icon('download')}导出当前答案</button><button class="button primary" data-action="apply-answers">${icon('check')}导入粘贴内容</button></div></section></div>`;
 }
 function autoModal() {
-  const auto = state.auto;
-  const provider = providerById(auto.preset);
-  const isFilled = q => Boolean((q.answer || '').trim() && (q.analysis || '').trim());
-  const pending = chosen().filter(q => auto.overwrite || !isFilled(q)).length;
-  const via = auto.preset === 'custom' ? (auto.via || 'direct') : provider.via;
-  return `<div class="modal-backdrop"><section class="modal answers-modal auto-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">AUTO SOLVE</span><h2 id="modal-title">让模型先做一遍</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><p class="answers-intro">开始后，每道未填写答案的题目截图会发送到你选择的模型服务。自动解答是可选功能；不使用时试卷仍只在本地处理。结果会写回每题，仍可人工修改。</p><div class="answers-stats"><span>待解答 <b>${pending}</b> 题</span><span>共 <b>${chosen().length}</b> 题</span></div><fieldset><legend>模型服务</legend><div class="solution-options">${answerProviders.map(p => `<button class="${auto.preset === p.id ? 'selected' : ''}" data-action="auto-provider" data-value="${p.id}"><b>${p.name}</b><small>${p.via === 'proxy' ? '需本地转发' : '浏览器直连'}</small></button>`).join('')}</div><p class="format-tip">${esc(provider.note)}</p></fieldset><label class="form-label">接口地址<input data-field="auto-base" value="${esc(auto.base)}" placeholder="https://…/chat/completions"/></label><label class="form-label">模型名称<input data-field="auto-model" value="${esc(auto.model)}" placeholder="glm-4v-flash / qwen-vl-plus"/></label><label class="form-label">API Key<input type="password" data-field="auto-key" value="${esc(auto.key)}" placeholder="只保存在本页内存，刷新即清空" autocomplete="off"/></label>${auto.preset === 'custom' ? `<label class="form-label">连接方式<select data-field="auto-via"><option value="direct" ${via === 'direct' ? 'selected' : ''}>浏览器直连</option><option value="proxy" ${via === 'proxy' ? 'selected' : ''}>经本地转发</option></select></label>` : ''}<label class="toggle-row"><div><b>覆盖已填写的答案</b><small>关闭时只解答空白或只有一半内容的题</small></div><input type="checkbox" data-field="auto-overwrite" ${auto.overwrite ? 'checked' : ''}/><span class="toggle"></span></label>${via === 'proxy' ? `<label class="form-label">转发地址<input data-field="auto-proxy" value="${esc(auto.proxy)}" placeholder="http://127.0.0.1:5199/api/answer"/></label><p class="format-tip">先在项目目录运行 <code>npm run answer:proxy</code> 并保持窗口开启；它只转发请求，不在本地运行模型。</p>` : ''}<details class="answers-format"><summary>免费模型与 Key</summary><p>DeepSeek deepseek-flash：官方支持图片，浏览器可直连，按量计费。智谱 glm-4v-flash：免费模型，但需本地转发。通义千问 VL：开通百炼后有免费额度，浏览器可直连。Key 只保存在本页内存。</p></details><div class="answers-actions"><button class="button secondary" data-action="close">取消</button><button class="button primary" data-action="auto-solve" ${!pending ? 'disabled' : ''}>${icon('sparkles')}开始自动解答</button></div></section></div>`;
+  const auto=state.auto,provider=providerById(auto.preset);
+  const pending=chosen().filter(q=>auto.overwrite || !isAutoComplete(q)).length;
+  const via=auto.preset==='custom' ? (auto.via || 'direct') : provider.via;
+  return `<div class="modal-backdrop"><section class="modal answers-modal auto-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-heading"><div><span class="eyebrow small">AUTO SOLVE</span><h2 id="modal-title">让模型先做一遍</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div>
+    <p class="answers-intro">点击开始后，题干与配图截图会发送到你选择的模型服务。自动解答可选，结果仍需核对；不使用时试卷只在本地处理。</p>
+    <div class="answers-stats"><span>待解答 <b>${pending}</b> 题</span><span>共 <b>${chosen().length}</b> 题</span></div>
+    <fieldset><legend>模型服务</legend><div class="solution-options">${answerProviders.map(p=>`<button class="${auto.preset===p.id ? 'selected' : ''}" data-action="auto-provider" data-value="${p.id}"><b>${p.name}</b><small>${p.via==='proxy' ? '需本地转发' : '浏览器直连'}</small></button>`).join('')}</div><p class="format-tip">${esc(provider.note)}</p></fieldset>
+    <label class="form-label">接口地址<input data-field="auto-base" value="${esc(auto.base)}" placeholder="https://…/chat/completions"/></label>
+    <label class="form-label">模型名称<input data-field="auto-model" value="${esc(auto.model)}"/></label>
+    <label class="form-label">API Key<input type="password" data-field="auto-key" placeholder="未勾选记住时，仅本次使用" autocomplete="off"/></label>
+    <label class="toggle-row"><div><b>仅在这台设备记住 API Key</b><small>保存在当前浏览器，分享 HTML / ZIP 不会带上 Key</small></div><input type="checkbox" data-field="auto-remember" ${auto.remember ? 'checked' : ''}/><span class="toggle"></span></label>
+    <button class="text-button" data-action="forget-key">清除本机保存的 Key</button>
+    <p class="format-tip">不同模型服务分别保存。其他人的电脑或浏览器需要填写自己的 Key；共用本机浏览器时可先清除。</p>
+    ${auto.preset==='custom' ? `<label class="form-label">连接方式<select data-field="auto-via"><option value="direct" ${via==='direct' ? 'selected' : ''}>浏览器直连</option><option value="proxy" ${via==='proxy' ? 'selected' : ''}>经本地转发</option></select></label>` : ''}
+    <label class="toggle-row"><div><b>覆盖已填写的答案</b><small>关闭时保留已填写字段，只补未完成的内容</small></div><input type="checkbox" data-field="auto-overwrite" ${auto.overwrite ? 'checked' : ''}/><span class="toggle"></span></label>
+    ${via==='proxy' ? `<label class="form-label">转发地址<input data-field="auto-proxy" value="${esc(auto.proxy)}"/></label><p class="format-tip">先运行 <code>npm run answer:proxy</code> 并保持窗口开启；它只转发请求，不在本地运行模型。</p>` : ''}
+    <p class="format-tip">长题会分片并补充配图特写。DeepSeek 使用思考模式；输出截断时会提高上限重试，增加的用量由你的模型账户计费。</p>
+    <div class="answers-actions"><button class="button secondary" data-action="answer-images">核对当前题图</button><button class="button secondary" data-action="answer-report">下载排查记录</button><button class="button primary" data-action="auto-solve" ${!pending ? 'disabled' : ''}>${icon('sparkles')}开始自动解答</button></div>
+  </section></div>`;
 }
+function answerImagesModal() {
+  const preview=state.answerPreview;
+  return `<div class="modal-backdrop"><section class="modal answers-modal answer-images-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><h2 id="modal-title">${esc(preview.title)} · 发送题图</h2><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><p>${preview.matches ? '以下图片与该题最近一次发送的图片一致。' : '以下为当前待发送图片；选框改变后请重新解答。'} 图中文字和配图应完整清晰。</p>${preview.images.map(image=>`<figure><figcaption>${esc(image.label)} · ${image.width} × ${image.height}</figcaption><img src="${image.url}" alt="${esc(image.label)}"/></figure>`).join('')}</section></div>`;
+}
+async function showAnswerImages() {
+  const q=selectedQuestion();if(!q) return;
+  try {
+    const images=prepareQuestionImages(q,state.pages),previous=q.autoResult?.images || [];
+    state.answerPreview={title:q.title,images,matches:images.length===previous.length && images.every((image,i)=>image.hash===previous[i].hash)};
+    state.modal='answer-images';render();
+  } catch(error) {toast(`题图生成失败：${error.message}`);}
+}
+function downloadAnswerReport() {
+  const entries=state.questions.filter(q=>q.autoResult).map(q=>({number:q.number,title:q.title,...q.autoResult}));
+  if(!entries.length) {toast('还没有自动解答记录');return;}
+  const url=URL.createObjectURL(new Blob([JSON.stringify({paper:state.options.title,questions:entries},null,2)],{type:'application/json'}));
+  const link=document.createElement('a');link.href=url;link.download='自动解答排查记录.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+
 function render() {
   const paperScroll = document.querySelector('.paper-scroll')?.scrollTop || 0;
   const listScroll = document.querySelector('.question-list')?.scrollTop || 0;
@@ -138,6 +182,15 @@ function render() {
     link.download = source.split('/').pop();
   });
   createIcons({icons: iconSet});
+  const keyInput=app.querySelector('[data-field="auto-key"]');
+  if(keyInput) keyInput.value=state.auto.key;
+  if(state.modal==='answer-images') app.insertAdjacentHTML('beforeend',answerImagesModal());
+  const editor=app.querySelector('.selection-editor'),q=selectedQuestion();
+  if(editor && q) {
+    const trace=q.autoResult;
+    editor.insertAdjacentHTML('beforeend',`<div class="answer-diagnostic">${trace ? `<b>${trace.status==='success' ? '模型已返回' : '自动解答待核对'}</b><p>${esc(trace.message)}</p><small>${esc(trace.model)} · ${trace.attempts} 次请求 · ${trace.images.length} 张题图${trace.finishReason ? ` · ${esc(trace.finishReason)}` : ''}</small>` : ''}<button class="text-button" data-action="answer-images">核对发送题图</button></div>`);
+  }
+  if(state.autoRunning) {const tip=app.querySelector('.busy-card p');if(tip) tip.textContent='正在请求你选择的模型服务，复杂题需要更多时间';}
   const paper = document.querySelector('.paper-scroll');
   if (paper) paper.scrollTop = paperScroll;
   const list = document.querySelector('.question-list');
@@ -183,10 +236,12 @@ async function loadDemo() {
 }
 function resplit() {
   snapshot();
+  const previous=state.questions;
   state.questions = segmentPages(state.pages, state.columns);
+  const kept=preserveSolutions(previous,state.questions);
   state.selected = state.questions[0]?.id || null;
   render();
-  toast(`已重新拆分为 ${state.questions.length} 道题，原有手动修改可撤销恢复`);
+  toast(`已重新拆分为 ${state.questions.length} 道题，保留 ${kept} 题答案；原有手动修改可撤销恢复`);
 }
 async function runOCR() {
   if (state.busy) return;
@@ -200,7 +255,9 @@ async function runOCR() {
     await recognizePages(state.pages, progress);
     cache.clear();
     snapshot();
+    const previous=state.questions;
     state.questions = segmentPages(state.pages, state.columns);
+    preserveSolutions(previous,state.questions);
     state.selected = state.questions[0]?.id || null;
     state.notice = 'OCR 用于识别题号，导出仍使用试卷原图。请校对拆分，特别是模糊、倾斜和多栏试卷；原有手动拆分可撤销恢复。';
     toast(`OCR 完成，拆分出 ${state.questions.length} 道题`);
@@ -253,66 +310,61 @@ function downloadAnswers() {
   toast(`已导出 ${data.questions.length} 题的答案与解析`);
 }
 async function runAutoSolve() {
-  const preset = providerById(state.auto.preset);
-  const provider = {base: state.auto.base, model: state.auto.model, via: state.auto.preset === 'custom' ? (state.auto.via || 'direct') : preset.via};
-  const isFilled = q => Boolean((q.answer || '').trim() && (q.analysis || '').trim());
-  const queue = chosen().filter(q => state.auto.overwrite || !isFilled(q));
-  if (!queue.length) {toast(state.auto.overwrite ? '没有已勾选的题目' : '所有题目都已填写，可勾选「覆盖已填写的答案」重新解答'); return;}
-  if (!provider.base || !provider.model) {toast('请填写接口地址和模型名称'); return;}
-  if (!state.auto.key && state.auto.preset !== 'custom') {toast('请填写 API Key'); return;}
-  snapshot();
-  state.modal = null;
-  state.busy = true;
-  state.message = '正在自动解答…';
-  state.progress = 0;
-  render();
-  const failures = [];
-  let done = 0;
+  if(state.busy) return;
+  const preset=providerById(state.auto.preset);
+  const provider={base:state.auto.base,model:state.auto.model,via:state.auto.preset==='custom' ? (state.auto.via || 'direct') : preset.via};
+  const queue=chosen().filter(q=>state.auto.overwrite || !isAutoComplete(q));
+  if(!queue.length) {toast('所有已勾选题目都已填写，可选择覆盖后重新解答');return;}
+  if(!provider.base || !provider.model) {toast('请填写接口地址和模型名称');return;}
+  if(!state.auto.key && state.auto.preset!=='custom') {toast('请填写本渠道的 API Key');return;}
+  saveCredential();snapshot();state.modal=null;state.busy=true;state.autoRunning=true;
+  state.message='正在准备题目图片…';state.progress=0;render();
+  const failures=[];let done=0;
   try {
-    for (const [index, q] of queue.entries()) {
-      progress(`自动解答 · 第 ${index + 1} / ${queue.length} 题 · ${q.title}`, index / queue.length);
-      const canvas = composeQuestion(q, state.pages, 1400);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      canvas.width = 0;
-      let result = null, lastError = null;
-      // 单题失败不再中断整卷：限流 / 超时 / 网络错误最多重试 3 次，其余错误直接记录并继续。
-      for (let attempt = 1; attempt <= 3 && !result; attempt++) {
-        try {
-          result = await solveQuestion({provider, dataUrl, apiKey: state.auto.key, proxyUrl: state.auto.proxy});
-        } catch (error) {
-          lastError = error;
-          console.error(`自动解答 · ${q.title}`, error);
-          const retryable = /429|超时|Failed to fetch|无法连接|\b5\d\d\b/.test(String(error?.message || ''));
-          if (!retryable || attempt === 3) break;
-          progress(`第 ${index + 1} 题请求失败，${attempt * 3} 秒后重试…`, index / queue.length);
-          await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+    for(const [index,q] of queue.entries()) {
+      const started=Date.now();let result=null,lastError=null,maxTokens=answerTokenBudget(provider);
+      const trace={status:'error',model:provider.model,attempts:0,history:[],images:[],sourcePages:[...new Set(q.segments.map(s=>s.page+1))]};
+      try {
+        progress(`自动解答 · ${q.title} · 准备题图`,index/queue.length);
+        const images=prepareQuestionImages(q,state.pages);
+        trace.images=images.map(({url,...metadata})=>metadata);
+        for(let attempt=1;attempt<=3 && !result;attempt++) {
+          trace.attempts=attempt;trace.maxTokens=maxTokens;
+          progress(`自动解答 · ${q.title} · ${images.length} 张题图 · 第 ${attempt} 次请求`,index/queue.length);
+          try {
+            result=await solveQuestion({provider,dataUrls:images.map(image=>image.url),apiKey:state.auto.key,proxyUrl:state.auto.proxy,maxTokens,
+              onResponse:meta=>Object.assign(trace,meta)});
+            trace.history.push({attempt,maxTokens,category:'returned',finishReason:trace.finishReason,completionTokens:trace.completionTokens});
+          } catch(error) {
+            lastError=error;Object.assign(trace,error.meta || {});
+            trace.history.push({attempt,maxTokens,category:error.code,...error.meta});
+            if(!error.retryable || attempt===3) break;
+            if(error.code==='truncated' || error.code==='reasoning_only') maxTokens=Math.min(65536,maxTokens*2);
+            progress(`${q.title}：${error.message}，即将重试`,index/queue.length);
+            await new Promise(resolve=>setTimeout(resolve,attempt*3000));
+          }
         }
+        if(result) {
+          if(!acceptAutoSolution(q,result,state.auto.overwrite)) {
+            trace.status='unresolved';trace.category='model_uncertain';trace.message=result.analysis || '模型未给出完整答案，请先核对发送题图';
+            failures.push(q.title);
+          } else {
+            trace.status='success';trace.category='answered';trace.message='模型已返回答案，请核对推导和结果';done++;
+          }
+        } else {
+          trace.category=lastError?.code || 'request';trace.message=lastError?.message || '请求未完成';failures.push(q.title);
+        }
+      } catch(error) {
+        trace.category='image';trace.message=`题图生成失败：${error.message}`;failures.push(q.title);
       }
-      if (result) {
-        q.answer = result.answer;
-        q.analysis = result.analysis;
-        done++;
-      } else {
-        failures.push(`${q.title}（${lastError?.message || '未知错误'}）`);
-      }
-      render();
+      trace.elapsedMs=Date.now()-started;q.autoResult=trace;render();
     }
-    if (done && state.options.solutions === 'none') state.options.solutions = 'reveal';
-    if (failures.length) {
-      state.notice = `自动解答完成 ${done} / ${queue.length} 题，${failures.length} 题失败：${failures.slice(0, 3).join('；')}${failures.length > 3 ? ' 等' : ''}。可再次点「自动解答」只重试未完成的题目。`;
-      toast(`完成 ${done} 题，${failures.length} 题失败，可直接重试`);
-    } else {
-      state.notice = '';
-      toast(`已自动解答 ${done} 题，请逐题核对`);
-    }
-  } catch (error) {
-    console.error(error);
-    toast(`自动解答中断（已完成 ${done} 题）：${error.message || error}`);
-  } finally {
-    state.busy = false;
-    render();
-  }
+    if(done && state.options.solutions==='none') state.options.solutions='reveal';
+    state.notice=failures.length ? `自动解答完成 ${done} / ${queue.length} 题，${failures.length} 题失败或待核对：${failures.join('、')}。选中题目可查看原因与实际发送题图；再次自动解答会补未完成题目。` : '';
+    toast(failures.length ? `完成 ${done} 题，${failures.length} 题失败或待核对` : `已自动解答 ${done} 题，请逐题核对`);
+  } finally {state.busy=false;state.autoRunning=false;render();}
 }
+
 async function download() {
   if (!chosen().length || state.busy) return;
   state.busy = true;
@@ -330,7 +382,7 @@ async function download() {
       await exportPPTX(state.questions, state.pages, state.options, progress);
     }
     state.modal = null;
-    toast(`已生成 ${chosen().length} 页${state.options.format === 'enbx' ? '希沃原生课件' : state.options.format === 'seewo' ? '希沃导入课件' : ' PPT'}，请在浏览器下载列表中查看`);
+    toast(`已生成 ${exportPageCount(state.questions,state.options)} 页${state.options.format === 'enbx' ? '希沃原生课件' : state.options.format === 'seewo' ? '希沃导入课件' : ' PPT'}，请在浏览器下载列表中查看`);
   } catch (e) {console.error(e); toast(e.message || '生成失败，请减少题目数量后重试。');}
   finally {state.busy = false; render();}
 }
@@ -362,7 +414,10 @@ app.addEventListener('click', event => {
     case 'ocr': runOCR(); return;
     case 'answers': state.modal = 'answers'; break;
     case 'auto': state.modal = 'auto'; break;
-    case 'auto-provider': {const provider = providerById(button.dataset.value); state.auto.preset = provider.id; state.auto.base = provider.base; state.auto.model = provider.model; state.auto.via = provider.via;} break;
+    case 'auto-provider': {saveCredential();const provider=providerById(button.dataset.value);state.auto=credentialStore.select({...state.auto,preset:provider.id,base:provider.base,model:provider.model,via:provider.via});} break;
+    case 'forget-key': credentialStore.clear();state.auto.key='';state.auto.remember=false;toast('已清除本浏览器保存的 API Key');break;
+    case 'answer-images': showAnswerImages();return;
+    case 'answer-report': downloadAnswerReport();return;
     case 'auto-solve': runAutoSolve(); return;
     case 'apply-answers': applyAnswerText(document.getElementById('answers-text')?.value || ''); return;
     case 'answers-json': document.getElementById('answers-input').click(); return;
@@ -400,7 +455,8 @@ app.addEventListener('change', event => {
     case 'include': snapshot(); state.questions.find(item => item.id === el.dataset.id).included = el.checked; break;
     case 'question-title': if (q) {snapshot(); q.title = el.value.trim() || '未命名题目';} break;
     case 'export-title': state.options.title = el.value.trim() || state.file.name.replace(/\.[^.]+$/, ''); return;
-    case 'auto-via': state.auto.via = el.value; break;
+    case 'auto-via': state.auto.via = el.value; saveCredential();break;
+    case 'auto-remember': state.auto.remember=el.checked;saveCredential();break;
     case 'auto-overwrite': state.auto.overwrite = el.checked; break;
     case 'headings': case 'blankSpace': state.options[el.dataset.field] = el.checked; break;
     case 'crop': if (q) {snapshot(); const i = Number(el.dataset.index); q.segments[i] = normalizeCrop({...q.segments[i], [el.dataset.key]: Number(el.value) / 100});} break;
@@ -414,11 +470,17 @@ app.addEventListener('input', event => {
   if (field === 'export-title') {state.options.title = event.target.value; return;}
   if (field === 'question-answer' || field === 'question-analysis') {
     const q = selectedQuestion();
-    if (q) q[field === 'question-answer' ? 'answer' : 'analysis'] = event.target.value;
+    if (q) {q[field === 'question-answer' ? 'answer' : 'analysis'] = event.target.value;if(q.autoResult?.status!=='success') delete q.autoResult;}
     return;
   }
   if (field === 'auto-base' || field === 'auto-model' || field === 'auto-key' || field === 'auto-proxy') {
+    const scope=credentialScope(state.auto);
     state.auto[field.slice(5)] = event.target.value;
+    if(field==='auto-base' && scope!==credentialScope(state.auto)) {
+      state.auto=credentialStore.select(state.auto);
+      const input=app.querySelector('[data-field="auto-key"]');if(input) input.value=state.auto.key;
+      const remember=app.querySelector('[data-field="auto-remember"]');if(remember) remember.checked=state.auto.remember;
+    } else saveCredential();
     return;
   }
   if (event.target.id === 'answers-text') state.answerDraft = event.target.value;

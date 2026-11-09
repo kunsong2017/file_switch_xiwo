@@ -1,6 +1,7 @@
 import {renderPage, renderSolutionPage} from './seewo.js';
 import {themes} from './export.js';
 import {hasSolution} from './solutions.js';
+import {solutionPagePlans, exportPageCount} from './solution-layout.js';
 import {buildENBX} from './enbx-package.js';
 import metadata from './enbx-metadata.xml?raw';
 
@@ -14,7 +15,7 @@ export async function exportENBX(questions,pages,options,onProgress) {
   if(!chosen.length) throw new Error('请至少勾选一道题目。');
   const mode=options.solutions || 'none';
   const solved=mode==='none' ? [] : chosen.filter(hasSolution);
-  const total=chosen.length+solved.length;
+  const total=exportPageCount(questions,{...options,format:'enbx'});
   const slides=[];
   let thumbnail;
   let page=0;
@@ -34,9 +35,11 @@ export async function exportENBX(questions,pages,options,onProgress) {
     }
     canvas.width=0;
     if(steps===2) {
-      const solution=renderSolutionPage(chosen[i],pages,options,page++,total,2);
+      for(let part=0;part<solutionPagePlans(chosen[i],options).length;part++) {
+      const solution=renderSolutionPage(chosen[i],pages,options,page++,total,2,part);
       slides.push({png:await pngBytes(solution),width:solution.width,height:solution.height});
       solution.width=0;
+      }
     }
   }
   const background=document.createElement('canvas');

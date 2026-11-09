@@ -18,6 +18,7 @@
     "test:enbx": "node tests/enbx-reader.mjs",
     "test:offline": "node tests/offline.mjs",
     "test:exams": "node tests/exams.mjs",
+    "test:answers": "node tests/answer-workflow.mjs",
     "answer:proxy": "node scripts/answer-proxy.mjs"
   },
   "dependencies": {

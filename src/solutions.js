@@ -9,7 +9,7 @@ const ANALYSIS = /^\s*(?:【\s*解析\s*】|解析)\s*[:：]?\s*(.*)$/;
 const strip = text => text.replace(/\r\n?/g, '\n').replace(/\s+$/g, '');
 
 function readBlock(text) {
-  const lines = text.split('\n');
+  const lines = text.replace(/[;；]\s*(?=【\s*(?:答案|解析)\s*】|(?:答案|解析)\s*[:：])/g, '\n').split('\n');
   let field = null;
   const answer = [];
   const analysis = [];
@@ -68,6 +68,7 @@ export function applySolutions(questions, entries) {
     if (!q) continue;
     if (entry.answer) q.answer = entry.answer;
     if (entry.analysis) q.analysis = entry.analysis;
+    delete q.autoResult;
     applied++;
   }
   return applied;
@@ -91,4 +92,26 @@ export function solutionStats(questions) {
     answer: questions.filter(q => (q.answer || '').trim()).length,
     analysis: questions.filter(q => (q.analysis || '').trim()).length,
   };
+}
+
+// Re-segmentation recreates question objects. Only transfer an unambiguous
+// question number, so changing columns/OCR cannot attach an answer elsewhere.
+export function preserveSolutions(previous, questions) {
+  const unique = list => {
+    const byNumber = new Map();
+    for (const q of list) if (Number.isInteger(q.number)) {
+      byNumber.set(q.number, byNumber.has(q.number) ? null : q);
+    }
+    return byNumber;
+  };
+  const before = unique(previous), after = unique(questions);
+  let kept = 0;
+  for (const [number, q] of after) {
+    const old = before.get(number);
+    if (!q || !old || !hasSolution(old)) continue;
+    q.answer = old.answer || '';
+    q.analysis = old.analysis || '';
+    kept++;
+  }
+  return kept;
 }

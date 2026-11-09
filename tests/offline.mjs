@@ -7,6 +7,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
 import {validateENBX} from './enbx-validation.mjs';
+import {verifyCredentialUI} from './credential-ui.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const temporary = await mkdtemp(path.join(tmpdir(), 'tiye-offline-'));
@@ -75,6 +76,7 @@ try {
   await page.locator('.workspace').waitFor({timeout: 45000});
   await settle();
   assert.equal(await count(), 6, 'embedded PDF example has six questions');
+  await verifyCredentialUI(page,browser,page.url());
   await download('pptx', 6, 'offline-pdf.pptx');
   await download('seewo', 6, 'offline-seewo.pptx');
   await download('enbx', 6, 'native-pdf-six-questions.enbx');

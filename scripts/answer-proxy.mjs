@@ -49,6 +49,9 @@ const server = http.createServer(async (request, response) => {
     response.writeHead(404, {...cors, 'Content-Type': 'text/plain; charset=utf-8'}).end('Not found');
     return;
   }
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),180000);
+  response.on('close',()=>{if(!response.writableEnded) controller.abort();});
   try {
     const payload = JSON.parse(await readBody(request));
     const upstream = new URL(String(payload.url || ''));
@@ -57,14 +60,14 @@ const server = http.createServer(async (request, response) => {
     }
     const headers = {'Content-Type': 'application/json'};
     if (payload.apiKey) headers.Authorization = `Bearer ${payload.apiKey}`;
-    const result = await fetch(upstream.href, {method: 'POST', headers, body: JSON.stringify(payload.body)});
+    const result = await fetch(upstream.href, {method: 'POST', headers, body: JSON.stringify(payload.body),signal:controller.signal,redirect:'error'});
     const text = await result.text();
     response.writeHead(result.status, {...cors, 'Content-Type': 'application/json; charset=utf-8'}).end(text);
     console.log(`[answer-proxy] ${upstream.hostname} → ${result.status}`);
   } catch (error) {
-    response.writeHead(400, {...cors, 'Content-Type': 'application/json; charset=utf-8'})
-      .end(JSON.stringify({error: String(error?.message || error)}));
-  }
+    if(!response.destroyed) response.writeHead(error?.name==='AbortError' ? 504 : 400, {...cors, 'Content-Type': 'application/json; charset=utf-8'})
+      .end(JSON.stringify({error:error?.name==='AbortError' ? '模型请求超时' : String(error?.message || error)}));
+  } finally {clearTimeout(timer);}
 });
 
 server.listen(port, bind, () => {

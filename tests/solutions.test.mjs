@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseSolutionsText, parseSolutionsJSON, applySolutions, buildSolutionExport, solutionStats, hasSolution} from '../src/solutions.js';
+import {parseSolutionsText, parseSolutionsJSON, applySolutions, buildSolutionExport, solutionStats, hasSolution, preserveSolutions} from '../src/solutions.js';
 import {timingXML, shapeIdsByName, addTimingToSlide} from '../src/reveal.js';
 
 const questions = () => [
@@ -29,14 +29,23 @@ test('行内标记与【】标记都能识别', () => {
   const [entry] = parseSolutionsText('7. 【答案】B\n【解析】由勾股定理。');
   assert.equal(entry.answer, 'B');
   assert.equal(entry.analysis, '由勾股定理。');
+  assert.deepEqual(parseSolutionsText('1. 答案：D；解析：因为反比例函数。'),[{number:1,answer:'D',analysis:'因为反比例函数。'}]);
+});
+
+test('重新分题保留唯一题号的答案，重复题号不误配',()=>{
+  const previous=[{number:1,answer:'D',analysis:'解析一'},{number:2,answer:'A',analysis:'二'},{number:2,answer:'B',analysis:'续'}];
+  const next=[{number:1},{number:2},{number:3}];
+  assert.equal(preserveSolutions(previous,next),1);assert.equal(next[0].answer,'D');assert.equal(next[0].analysis,'解析一');assert.equal(next[1].answer,undefined);
 });
 
 test('按题号匹配，匹配不到的不改写题目', () => {
   const qs = questions();
+  qs[1].autoResult={status:'unresolved'};
   const applied = applySolutions(qs, [{number: 2, answer: 'C', analysis: '解析 2'}, {number: 99, answer: 'X', analysis: 'Y'}]);
   assert.equal(applied, 1);
   assert.equal(qs[1].answer, 'C');
   assert.equal(qs[1].analysis, '解析 2');
+  assert.equal(qs[1].autoResult,undefined,'manual imports supersede an earlier unresolved-model status');
   assert.equal(qs[0].answer, '');
 });
 

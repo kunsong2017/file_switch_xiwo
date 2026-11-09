@@ -38,3 +38,7 @@
 .form-label>select{display:block;width:100%;margin-top:10px;border:1px solid #dbe4cd;background:#fff;padding:9px 10px;border-radius:6px;font-size:11px;color:#657852}
 .auto-modal .form-label{margin-top:12px}
 .auto-modal code{padding:1px 4px;background:#f0f3e9;border-radius:3px;font-size:9px;color:#5c6b50}
+.answer-images-modal figure {margin:20px 0;border:1px solid #dfe4db;padding:12px;border-radius:12px}
+.answer-images-modal img {display:block;max-width:100%;height:auto;margin:12px auto}
+.answer-diagnostic {margin-top:12px;padding:12px;border:1px solid #dfe4db;border-radius:10px;overflow-wrap:anywhere}
+.answer-diagnostic p,.answer-diagnostic small {display:block;font-size:12px;line-height:1.6}

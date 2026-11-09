@@ -71,10 +71,16 @@ try {
       const {segmentPages}=await import('/src/segment.js');
       const {pageLayout}=await import('/src/layout.js');
       const {renderPage}=await import('/src/seewo.js');
+      const {prepareQuestionImages}=await import('/src/answer-image.js');
+      const {buildAnswerRequest,providerById}=await import('/src/answer.js');
       const pages=await readDocument(new File([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],sample.file),()=>{});
       if(sample.ocr) {let last='';await recognizePages(pages,text=>{if(text!==last){last=text;console.log('EXAM '+text);}});}
       const questions=segmentPages(pages),options={ratio:'16:9',theme:'clean',headings:true,blankSpace:false,title:sample.file.replace(/\.pdf$/,'')};
       globalThis.examRegression={pages,questions,options};
+      const answerImages=sample.key==='exam2' ? questions.filter(q=>[14,16,19,24,26,27].includes(q.number)).map(q=>{
+        const images=prepareQuestionImages(q,pages),request=buildAnswerRequest({provider:providerById('deepseek'),dataUrls:images.map(image=>image.url)});
+        return {number:q.number,images,requestImages:request.messages[0].content.filter(c=>c.type==='image_url').length};
+      }) : [];
       const inkChecks=sample.inkRegions.map(([number,pi,x,y,w,h])=>{
         const p=pages[pi],pixels=p.canvas.getContext('2d').getImageData(0,0,p.width,p.height).data,points=[];
         for(let py=Math.ceil(y*p.height);py<(y+h)*p.height;py+=2) for(let px=Math.ceil(x*p.width);px<(x+w)*p.width;px+=2) {
@@ -83,9 +89,16 @@ try {
         }
         return {number,page:pi,points};
       });
-      return {questions,inkChecks,pages:pages.map(({canvas,url,...meta})=>({...meta,exclusions:pageLayout(meta).exclusions})),previews:questions.map((q,i)=>renderPage(q,pages,options,i,questions.length).toDataURL('image/png'))};
+      return {questions,inkChecks,answerImages,pages:pages.map(({canvas,url,...meta})=>({...meta,exclusions:pageLayout(meta).exclusions})),previews:questions.map((q,i)=>renderPage(q,pages,options,i,questions.length).toDataURL('image/png'))};
     },{base64,sample});
     assert.deepEqual(result.questions.map(q=>q.number),Array.from({length:sample.count},(_,i)=>i+1),sample.file+' has every question exactly once');
+    for(const entry of result.answerImages) {
+      assert.equal(entry.images.length,entry.requestImages,'all prepared images are sent together');
+      assert.ok(entry.images.every(i=>i.width<=1600 && i.height<=1400));
+      assert.ok(entry.images.some(i=>i.kind==='figure'),`question ${entry.number} has a separate diagram close-up`);
+      if(entry.number===27) assert.ok(entry.images.filter(i=>i.kind==='question').length>1,'question 27 has full-resolution tiles');
+      for(const [index,image] of entry.images.entries()) await writeFile(`test-results/real-exams/sent-${entry.number}-${index+1}.jpg`,Buffer.from(image.url.split(',')[1],'base64'));
+    }
     for(const check of result.inkChecks) {
       assert.ok(check.points.length>8,`${sample.key} question ${check.number}: annotated text/letter region contains actual ink`);
       const q=result.questions.find(q=>q.number===check.number);

@@ -10,7 +10,9 @@ try {
   await page.setContent('<body style="margin:0"><div id="viewer"></div></body>');
   await page.addScriptTag({path:'node_modules/jszip/dist/jszip.min.js'});
   await page.addScriptTag({path:'third_party/OpenEnow.JS/openenow.js'});
-  const samples=process.argv.includes('--real-exams')
+  const samples=process.argv.includes('--solutions')
+    ? [['real-exams/exam2-enbx-paged.enbx',54],['real-exams/exam6-enbx-paged.enbx',52]]
+    : process.argv.includes('--real-exams')
     ? [['real-exams/exam2-enbx.enbx',27],['real-exams/exam6-enbx.enbx',26]]
     : [['native-pdf-six-questions.enbx',6],['native-word-six-questions.enbx',6]];
   for(const [name,count] of samples) {

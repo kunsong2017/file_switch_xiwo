@@ -6,6 +6,8 @@
 - PowerPoint 导出：`src/export.js`；希沃导入版：`src/seewo.js`；原生 ENBX：`src/enbx.js` / `src/enbx-package.js`。
 - 希沃导入版为 `.pptx`；原生 `.enbx` 必须生成包含 XML、资源关系及图片的实际课件包，不得只改扩展名。两者均整页图片。不得声称已通过未执行的希沃客户端验证。
 - 自动解答：请求构造与解析在 `src/answer.js`；本地转发在 `scripts/answer-proxy.mjs`（`npm run answer:proxy`）。免费模型预设：智谱 glm-4v-flash（需转发）、通义 qwen-vl-plus（直连）。不得声称已用真实 Key / 真实免费模型完成验收，除非实际执行过。
+- 本机 Key 记忆在 `src/credentials.js`：仅用户勾选时写浏览器本地存储，按接口隔离，不写 HTML 属性、源码、日志、答案 JSON、排查记录或课件。分享文件不能携带 Key；浏览器禁用存储时退回临时模式。回归 `npm run test:answers` 和真实 ZIP 的 `test:offline`，包含新浏览器上下文无 Key。
+- 解析分页统一由 `src/solution-layout.js` 规划；不可通过截掉行数适配版面。自动解答题图在 `src/answer-image.js`，长题分片、配图特写；`test:exams` 额外核对复习卷 2 的 14 / 16 / 19 / 24 / 26 / 27 题。不得将思考过程当最终答案，截断与模型无法确定必须区分。
 - 答案与解析：数据在 `src/solutions.js`（纯函数，Node 可直接测），点击动画在 `src/reveal.js`（生成后向 slide XML 注入 `<p:timing>`）。希沃两种格式只能分页显示；同页点击只用于 PowerPoint 导出。不得声称已在真实 PowerPoint / WPS 客户端验证动画放映效果。
 - `tests/solutions/` 是两份用户真卷的人工参考解答，改动分题或题号时同步核对；`npm run test:exams` 会导入它们并检查每页两次点击动画。
 - ENBX 改动先运行 `npm test` 和 `npm run test:browser`，再运行 `npm run test:enbx`，用独立读取器检查浏览器下载的原生文件。

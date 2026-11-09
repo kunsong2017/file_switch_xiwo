@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {answerProviders, providerById, buildAnswerRequest, parseAnswerJSON, messageText, solveQuestion} from '../src/answer.js';
+import {answerProviders, providerById, buildAnswerRequest, parseAnswerJSON, messageText, solveQuestion, readAnswerResponse, isUncertainSolution, acceptAutoSolution} from '../src/answer.js';
 
 const provider = {base: 'https://example.com/v1/chat/completions', model: 'vl-test', via: 'direct'};
 const dataUrl = 'data:image/jpeg;base64,AAAA';
@@ -51,7 +51,7 @@ test('直连请求带 Authorization，经转发时不带', async () => {
 test('错误响应与网络错误给出可读提示', async () => {
   await assert.rejects(
     solveQuestion({provider, dataUrl, fetchImpl: async () => ({ok: false, status: 401, text: async () => 'invalid key'})}),
-    /401.*invalid key/,
+    /401.*Key/,
   );
   await assert.rejects(
     solveQuestion({provider, dataUrl, fetchImpl: async () => {throw new TypeError('Failed to fetch');}}),
@@ -77,4 +77,37 @@ test('DeepSeek 预设发送图片而不是纯文本', () => {
   const body = buildAnswerRequest({provider: providerById('deepseek'), dataUrl});
   assert.equal(body.model, 'deepseek-flash');
   assert.deepEqual(body.messages[0].content.map(part => part.type), ['text', 'image_url']);
+  assert.equal(body.max_tokens,16384,'geometry reasoning must not be restricted to the old 2000-token budget');
+  assert.deepEqual(body.thinking,{type:'enabled'});
+  assert.deepEqual(body.response_format,{type:'json_object'});
+});
+
+test('整题、分片和配图都进入同一个题目请求',()=>{
+  const images=[dataUrl,dataUrl+'B',dataUrl+'C'];
+  const body=buildAnswerRequest({provider,dataUrls:images});
+  assert.deepEqual(body.messages[0].content.slice(1).map(part=>part.image_url.url),images);
+});
+test('等待响应头和读取正文都受到超时保护',async()=>{
+  for(const fetchImpl of [()=>new Promise(()=>{}),async()=>({ok:true,json:()=>new Promise(()=>{})})]) {
+    await assert.rejects(solveQuestion({provider,dataUrl,timeout:20,fetchImpl}),error=>error.code==='timeout');
+  }
+});
+test('区分思考耗尽、空响应、格式错误和模型未解出',()=>{
+  const truncated={choices:[{finish_reason:'length',message:{content:'',reasoning_content:'private reasoning'}}],usage:{completion_tokens:2000,completion_tokens_details:{reasoning_tokens:2000}}};
+  assert.throws(()=>readAnswerResponse(truncated),error=>error.code==='truncated' && error.meta.reasoningTokens===2000 && !error.message.includes('private'));
+  assert.throws(()=>readAnswerResponse({choices:[{message:{content:'',reasoning_content:'private'}}]}),e=>e.code==='reasoning_only');
+  assert.throws(()=>readAnswerResponse({choices:[{message:{content:'   '}}]}),e=>e.code==='empty');
+  assert.throws(()=>readAnswerResponse({choices:[{message:{content:'not json'}}]}),e=>e.code==='format');
+  assert.equal(isUncertainSolution({answer:'无法确定',analysis:'看不清图'}),true);
+  assert.equal(isUncertainSolution({answer:'D',analysis:'推导'}),false);
+});
+test('模型纯文本行内返回可解析',()=>{
+  assert.deepEqual(parseAnswerJSON('**答案**：D；解析：因为反比例函数。'),{answer:'D',analysis:'因为反比例函数。'});
+});
+test('补答保留老师已填字段，无法确定不能被当成成功答案',()=>{
+  const answerOnly={answer:'D',analysis:''};
+  assert.equal(acceptAutoSolution(answerOnly,{answer:'A',analysis:'模型解析'}),true);assert.equal(answerOnly.answer,'D');
+  const analysisOnly={answer:'',analysis:'老师解析'};
+  acceptAutoSolution(analysisOnly,{answer:'B',analysis:'模型解析'});assert.equal(analysisOnly.analysis,'老师解析');
+  const empty={answer:'',analysis:''};assert.equal(acceptAutoSolution(empty,{answer:'无法确定',analysis:'看不清图'}),false);assert.equal(empty.answer,'');
 });

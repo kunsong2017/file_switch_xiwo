@@ -1,5 +1,6 @@
-import {composeQuestion, themes, solutionFontSize} from './export.js';
+import {composeQuestion, themes} from './export.js';
 import {hasSolution} from './solutions.js';
+import {solutionPagePlans, exportPageCount} from './solution-layout.js';
 import pptxgen from 'pptxgenjs';
 
 // Render an entire page to an image so Seewo import does not depend on Office
@@ -68,64 +69,30 @@ export function renderPage(q, pages, options, index, total, resolution = 1) {
   return canvas;
 }
 
-function wrapText(ctx, text, maxWidth) {
-  const lines = [];
-  for (const paragraph of String(text).split('\n')) {
-    let line = '';
-    for (const char of paragraph) {
-      const next = line + char;
-      if (line && ctx.measureText(next).width > maxWidth) {lines.push(line); line = char;}
-      else line = next;
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-function drawParagraph(ctx, text, box, color) {
-  ctx.fillStyle = color;
-  ctx.textAlign = 'left';
-  let y = box.y;
-  for (const line of wrapText(ctx, text, box.w)) {
-    if (y + box.lineHeight > box.y + box.h) break;
-    ctx.fillText(line, box.x, y, box.w);
-    y += box.lineHeight;
-  }
-  return y;
-}
-
 // 解析页：题目缩小放在上方，下面显示解析与答案。希沃导入版 / 原生课件只有整页图片，
 // 因此“隐藏后点击出现”在这里落成“题目一页、解析一页”，翻页即出现。
-export function renderSolutionPage(q, pages, options, index, total, resolution = 1) {
+export function renderSolutionPage(q, pages, options, index, total, resolution = 1, part = 0) {
   const {canvas, ctx, pageWidth, pageHeight, theme} = pageCanvas(options, resolution);
+  const plan=solutionPagePlans(q,options)[part];
+  if(!plan) throw new Error('解析页不存在');
   ctx.textBaseline = 'top';
-  const top = drawHeading(ctx, `${q.title}　解析`, options, pageWidth, theme);
+  const top = drawHeading(ctx, `${q.title}　解析${part ? '（续）' : ''}`, options, pageWidth, theme);
   const question = composeQuestion(q, pages);
-  const box = {x: 60, y: top, w: pageWidth - 120, h: 300};
+  const box = {x: 60, y: top, w: pageWidth - 120, h: plan.questionHeight};
   const scale = Math.min(box.w / question.width, box.h / question.height);
   const width = question.width * scale, height = question.height * scale;
   ctx.drawImage(question, 60 + (box.w - width) / 2, top, width, height);
   question.width = 0;
-  const analysis = (q.analysis || '').trim(), answer = (q.answer || '').trim();
-  const panelTop = top + 320;
-  const answerHeight = answer ? 92 : 0;
-  if (analysis) {
-    ctx.fillStyle = `#${theme.panel}`;
-    ctx.fillRect(60, panelTop, pageWidth - 120, pageHeight - panelTop - answerHeight - 60);
-    ctx.font = '600 20px "Microsoft YaHei", "PingFang SC", sans-serif';
-    ctx.fillStyle = `#${theme.accent}`;
-    ctx.fillText('解析', 82, panelTop + 16);
-    const size = solutionFontSize(analysis, pageWidth - 164, pageHeight - panelTop - answerHeight - 92, 24, 13);
-    ctx.font = `${size}px "Microsoft YaHei", "PingFang SC", sans-serif`;
-    drawParagraph(ctx, analysis, {x: 82, y: panelTop + 52, w: pageWidth - 164, h: pageHeight - panelTop - answerHeight - 76, lineHeight: size * 1.55}, `#${theme.ink}`);
-  }
-  if (answer) {
-    const y = pageHeight - answerHeight - 30;
-    ctx.fillStyle = `#${theme.accent}`;
-    ctx.fillRect(60, y, pageWidth - 120, answerHeight);
-    ctx.font = `600 ${solutionFontSize(answer, pageWidth - 200, 60, 26, 15)}px "Microsoft YaHei", "PingFang SC", sans-serif`;
-    ctx.fillStyle = `#${theme.background}`;
-    drawParagraph(ctx, `答案　${answer}`, {x: 82, y: y + 18, w: pageWidth - 164, h: answerHeight - 30, lineHeight: 34}, `#${theme.background}`);
+  for(const block of plan.blocks) {
+    const answer=block.kind==='answer';
+    ctx.fillStyle=`#${answer ? theme.accent : theme.panel}`;
+    ctx.fillRect(block.x,block.y,block.w,block.h);
+    ctx.fillStyle=`#${answer ? theme.background : theme.accent}`;
+    ctx.font='600 20px "Microsoft YaHei", "PingFang SC", sans-serif';
+    ctx.fillText(block.label,block.x+22,block.y+14);
+    ctx.fillStyle=`#${answer ? theme.background : theme.ink}`;
+    ctx.font=`${block.size}px "Microsoft YaHei", "PingFang SC", sans-serif`;
+    block.lines.forEach((line,i)=>ctx.fillText(line,block.x+22,block.y+42+i*block.lineHeight));
   }
   drawFooter(ctx, index, total, pageWidth, pageHeight, theme);
   return canvas;
@@ -136,7 +103,7 @@ export async function exportSeewoPPTX(questions, pages, options, onProgress) {
   if (!chosen.length) throw new Error('请至少勾选一道题目。');
   const mode = options.solutions || 'none';
   const solved = mode === 'none' ? [] : chosen.filter(hasSolution);
-  const total = chosen.length + solved.length;
+  const total = exportPageCount(questions,{...options,format:'seewo'});
   const pptx = new pptxgen();
   pptx.layout = options.ratio === '4:3' ? 'LAYOUT_4x3' : 'LAYOUT_WIDE';
   pptx.author = '题页';
@@ -155,11 +122,13 @@ export async function exportSeewoPPTX(questions, pages, options, onProgress) {
     slide.addNotes(`希沃白板导入版。每页为完整图片，可在希沃内添加批注与其他元素。\n原试卷：${options.title}\n题目：${chosen[i].title}\n来源页：${[...new Set(chosen[i].segments.map(s => s.page+1))].join('、')}`);
     canvas.width = 0;
     if (solved.includes(chosen[i])) {
-      const solution = renderSolutionPage(chosen[i],pages,options,page++,total);
+      for(let part=0;part<solutionPagePlans(chosen[i],options).length;part++) {
+      const solution = renderSolutionPage(chosen[i],pages,options,page++,total,1,part);
       const answerSlide = pptx.addSlide();
       answerSlide.addImage({data:solution.toDataURL('image/png'),x:0,y:0,w:width,h:7.5,altText:`${chosen[i].title} 解析`});
       answerSlide.addNotes(`${chosen[i].title}\n\n【解析】\n${chosen[i].analysis || '（未填写）'}\n\n【答案】${chosen[i].answer || '（未填写）'}`);
       solution.width = 0;
+      }
     }
   }
   const name = (options.title || '试卷课件').replace(/[\\/:*?"<>|]/g,'_').slice(0,90);

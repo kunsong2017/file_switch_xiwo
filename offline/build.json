@@ -3,7 +3,7 @@
   "inputs": {
     "index.html": "3f8a08b8196c9eedf9880593bf3eb3b2e4994a6eaaae9c444b4bc09023103313",
     "package-lock.json": "39f32d04a055c66e92c933acf2db2695cf5a17e17756962e4610f7b5c17f718b",
-    "package.json": "06373387b87c124fb033cfb99de0ef1165acbc33fd8c77b3190ab405f1b61f45",
+    "package.json": "37017d943e759b2c1adfd76c1d579ffe2b2d771147e6116e0a43707165fe89ff",
     "public/examples/数学示例试卷.docx": "a6dbc0b6afea9454c4dfa2cf9bc5f8991423fefd082c230af763c74db5c5d292",
     "public/examples/数学示例试卷.pdf": "9d9600a5ce1b189bd464de4a6af9745d150d387437feb396aaeb588f93d8933b",
     "public/favicon.svg": "21a6171fe99cafc514a0cf7d3800d2121ea067976471e44268875aaf0b5625f1",
@@ -11,29 +11,32 @@
     "scripts/check-offline.mjs": "225492fa8127e6dca7956f90a50e2f9bc8f8897b21070e833266a16b251a9fdf",
     "scripts/download-languages.py": "c3c72e8776acbeeff8d529da6ab2e105b259750056278e8b1244555720f7da68",
     "scripts/prepare-assets.mjs": "b200ee4e13b56a4414f84e6fc43955e3c54f248cb8a9520250fbd3035f80383c",
-    "src/answer.js": "8b452c71e0e665101e65326a6f63981da66b57edbcd990f1651e81c9c130e123",
+    "src/answer-image.js": "00c673b20c8ae90f29a9562318c32d214b6e3f987c4c466f87735e910cdd9bdd",
+    "src/answer.js": "db7c671f69fcc79c6123f20c6b53412965e7b06b388a07928555c5d66e687754",
+    "src/credentials.js": "d9846ddb8d61ab4a7e7d8f970ce8bb22a5bee910ebceb79d623cdb16ea308a87",
     "src/document.js": "e8400a801ebfe87f9ab7335b848683e3993eea69a813d68c3fc9fd109d491682",
     "src/enbx-metadata.xml": "8d3651918617f391f2e5e3b6da1829d476d6b6fdd48487878cb2396d67677549",
     "src/enbx-package.js": "ff14ee614ddc497e305b6656ebc8e1c3967b5a39313f61d28331085898ff5f02",
-    "src/enbx.js": "9c4fddd0791f057dd666fafc929c5beb381125336c3d2ec0ed162604f7a41e31",
-    "src/export.js": "accad2eb503f7819eecd075e1bd6bd57b4881d2002862fdbd74c2d969349dbd5",
+    "src/enbx.js": "78adc766205692080495846218ab8ce4ca270e7efdc4b33f73d3ccf1013061a8",
+    "src/export.js": "bff8999e9c6e47f67a48e271982fe23ae72b81d12487d200179d473811b946f5",
     "src/figure-seam.js": "2357e82f012b4393488c437e014e0bfffbf94b857981bdef206d624feaa18f1b",
     "src/layout.js": "c9ca5a33e81a1f13f5882e02cd70baa64068593351882baaadedb0827db9583e",
-    "src/main.js": "8ce443b3b087f2891be40b4e9b5a9e399ab7c45532b68d05a8d22ac021847cc7",
+    "src/main.js": "f8e5f727f40b0bf872a21d2a90ed0a1e6dbca686c8d2e0d3fb54f38d02816a1e",
     "src/math.js": "621d45d56f94dcae017ad007a25c95941a2d427687cb9b42a6d05b30a1e6734a",
     "src/offline.js": "40d608d9b996a8aa183efd79a8899d5937b2e56be5dba7466651aeacaa565534",
     "src/pdf-graphics.js": "8cc791dd438cfb8a6c55bbf92199676041caaba09fad8490371adefda18015e0",
     "src/raster-graphics.js": "d8909446becb5f714b6e38bef6a793369c2b286738f2d869ec8d310a06e478b4",
     "src/reveal.js": "4e445f01ed7cbffc3aff11307d78d0522a49b4db17c527b0a4bc2c47678138b0",
-    "src/seewo.js": "400e1de500a86d8a8a89a9de551a8b1db0426cc837edbd3110c0c7bd37c150dd",
+    "src/seewo.js": "e4137d653a20bb8bc939952d4ba100deffddd89b7d664d1c68a3cac32f932cb2",
     "src/segment.js": "dee9ba99b251e721049c099ff2d46456807c29227ffcf5a4078e6f6008caabad",
-    "src/solutions.js": "5b53e2a9a2d56068c1343fc6039dfed1805af13bdc3e447c3ffe8eef85b20b34",
-    "src/style.css": "d894a35f1b680b66d492db7b341f9665b5e4ce94144bc05e5ee169dc5be90e8f",
+    "src/solution-layout.js": "f66ef716a9603c449a45a82c7a937fff27b9c5660551a22408f9d2c858adcc7e",
+    "src/solutions.js": "d92a8a5cefb040cfc8ee5f0743f7baf75731c3775eaa8db59009c2b02ebaa1b6",
+    "src/style.css": "d06be8fc4f45367ceb98ec2070291e0960aa5d5f5da3f6845e3f4d0642239e64",
     "third_party/OpenEnow.JS/LICENSE": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
-    "使用前先看.txt": "217a5ff4b934052823e7e4b1905d19cfab9a68db143f7164c7b015a53f5785f7"
+    "使用前先看.txt": "c45e37cd18295e72cfca78e7861dcce8ac8630b192a3d68a22607c36576eba55"
   },
   "files": {
-    "offline/index.html": "8dae6909549bc6aa608ff262bcb61eb6c237b2af3e6c4316de57b3849f96dbdb",
+    "offline/index.html": "76021f4ea14782925ccb1da40f01830deb52533aee0a9820262773224ef31a8c",
     "offline/licenses/OpenEnow.JS-MIT.txt": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
     "offline/licenses/docx-preview-LICENSE": "8668bf4417d161e4eb4d47d6044526e4914d9eb3c748573d9bb7e87708c1253f",
     "offline/licenses/html-to-image-LICENSE": "9fe73723f7a9e91057f73aafc9b6a3c3b2174db2b3ddc0a3a6a8ddf2bad68e37",
@@ -53,6 +56,6 @@
     "offline/licenses/tessdata_fast-Apache-2.0.txt": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
     "offline/licenses/tesseract.js-LICENSE.md": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
     "offline/licenses/tesseract.js-core-LICENSE": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
-    "offline/使用前先看.txt": "217a5ff4b934052823e7e4b1905d19cfab9a68db143f7164c7b015a53f5785f7"
+    "offline/使用前先看.txt": "c45e37cd18295e72cfca78e7861dcce8ac8630b192a3d68a22607c36576eba55"
   }
 }
