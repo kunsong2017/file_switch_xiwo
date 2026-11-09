@@ -11,7 +11,7 @@ const app = document.getElementById('app');
 const iconSet = {FileText, Upload, Download, ArrowRight, ArrowUpRight, Plus, X, Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Scissors, Layers, ScanLine, MousePointer2, Undo2, Trash2, ZoomIn, ZoomOut, CircleHelp, ShieldCheck, Monitor, Settings2, BookOpen, Presentation, Sparkles, RotateCcw, Columns2, Crop, CircleCheck};
 const icon = name => `<i data-lucide="${name}"></i>`;
 const esc = str => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false, solutions: 'none'}, auto: {preset: 'zhipu', base: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', model: 'glm-4v-flash', key: '', proxy: 'http://127.0.0.1:5199/api/answer'}};
+const state = {file: null, pages: [], questions: [], page: 0, selected: null, columns: 1, mode: 'select', zoom: 100, busy: false, progress: 0, message: '', modal: null, history: [], notice: '', options: {title: '', format: 'pptx', theme: 'clean', ratio: '16:9', headings: true, blankSpace: false, solutions: 'none'}, auto: {preset: 'deepseek', base: 'https://api.deepseek.com/chat/completions', model: 'deepseek-flash', key: '', proxy: 'http://127.0.0.1:5199/api/answer', overwrite: false}};
 let toastTimer;
 let drag = null;
 const cache = new Map();
@@ -123,9 +123,10 @@ function answersModal() {
 function autoModal() {
   const auto = state.auto;
   const provider = providerById(auto.preset);
-  const pending = chosen().filter(q => !(q.answer || '').trim()).length;
+  const isFilled = q => Boolean((q.answer || '').trim() && (q.analysis || '').trim());
+  const pending = chosen().filter(q => auto.overwrite || !isFilled(q)).length;
   const via = auto.preset === 'custom' ? (auto.via || 'direct') : provider.via;
-  return `<div class="modal-backdrop"><section class="modal answers-modal auto-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">AUTO SOLVE</span><h2 id="modal-title">让模型先做一遍</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><p class="answers-intro">开始后，每道未填写答案的题目截图会发送到你选择的模型服务。自动解答是可选功能；不使用时试卷仍只在本地处理。结果会写回每题，仍可人工修改。</p><div class="answers-stats"><span>待解答 <b>${pending}</b> 题</span><span>共 <b>${chosen().length}</b> 题</span></div><fieldset><legend>模型服务</legend><div class="solution-options">${answerProviders.map(p => `<button class="${auto.preset === p.id ? 'selected' : ''}" data-action="auto-provider" data-value="${p.id}"><b>${p.name}</b><small>${p.via === 'proxy' ? '需本地转发' : '浏览器直连'}</small></button>`).join('')}</div><p class="format-tip">${esc(provider.note)}</p></fieldset><label class="form-label">接口地址<input data-field="auto-base" value="${esc(auto.base)}" placeholder="https://…/chat/completions"/></label><label class="form-label">模型名称<input data-field="auto-model" value="${esc(auto.model)}" placeholder="glm-4v-flash / qwen-vl-plus"/></label><label class="form-label">API Key<input type="password" data-field="auto-key" value="${esc(auto.key)}" placeholder="只保存在本页内存，刷新即清空" autocomplete="off"/></label>${auto.preset === 'custom' ? `<label class="form-label">连接方式<select data-field="auto-via"><option value="direct" ${via === 'direct' ? 'selected' : ''}>浏览器直连</option><option value="proxy" ${via === 'proxy' ? 'selected' : ''}>经本地转发</option></select></label>` : ''}${via === 'proxy' ? `<label class="form-label">转发地址<input data-field="auto-proxy" value="${esc(auto.proxy)}" placeholder="http://127.0.0.1:5199/api/answer"/></label><p class="format-tip">先在项目目录运行 <code>npm run answer:proxy</code> 并保持窗口开启；它只转发请求，不在本地运行模型。</p>` : ''}<details class="answers-format"><summary>免费模型与 Key</summary><p>DeepSeek deepseek-flash：官方支持图片，浏览器可直连，按量计费。智谱 glm-4v-flash：免费模型，但需本地转发。通义千问 VL：开通百炼后有免费额度，浏览器可直连。Key 只保存在本页内存。</p></details><div class="answers-actions"><button class="button secondary" data-action="close">取消</button><button class="button primary" data-action="auto-solve" ${!pending ? 'disabled' : ''}>${icon('sparkles')}开始自动解答</button></div></section></div>`;
+  return `<div class="modal-backdrop"><section class="modal answers-modal auto-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><div><span class="eyebrow small">AUTO SOLVE</span><h2 id="modal-title">让模型先做一遍</h2></div><button class="icon-button" data-action="close" aria-label="关闭">${icon('x')}</button></div><p class="answers-intro">开始后，每道未填写答案的题目截图会发送到你选择的模型服务。自动解答是可选功能；不使用时试卷仍只在本地处理。结果会写回每题，仍可人工修改。</p><div class="answers-stats"><span>待解答 <b>${pending}</b> 题</span><span>共 <b>${chosen().length}</b> 题</span></div><fieldset><legend>模型服务</legend><div class="solution-options">${answerProviders.map(p => `<button class="${auto.preset === p.id ? 'selected' : ''}" data-action="auto-provider" data-value="${p.id}"><b>${p.name}</b><small>${p.via === 'proxy' ? '需本地转发' : '浏览器直连'}</small></button>`).join('')}</div><p class="format-tip">${esc(provider.note)}</p></fieldset><label class="form-label">接口地址<input data-field="auto-base" value="${esc(auto.base)}" placeholder="https://…/chat/completions"/></label><label class="form-label">模型名称<input data-field="auto-model" value="${esc(auto.model)}" placeholder="glm-4v-flash / qwen-vl-plus"/></label><label class="form-label">API Key<input type="password" data-field="auto-key" value="${esc(auto.key)}" placeholder="只保存在本页内存，刷新即清空" autocomplete="off"/></label>${auto.preset === 'custom' ? `<label class="form-label">连接方式<select data-field="auto-via"><option value="direct" ${via === 'direct' ? 'selected' : ''}>浏览器直连</option><option value="proxy" ${via === 'proxy' ? 'selected' : ''}>经本地转发</option></select></label>` : ''}<label class="toggle-row"><div><b>覆盖已填写的答案</b><small>关闭时只解答空白或只有一半内容的题</small></div><input type="checkbox" data-field="auto-overwrite" ${auto.overwrite ? 'checked' : ''}/><span class="toggle"></span></label>${via === 'proxy' ? `<label class="form-label">转发地址<input data-field="auto-proxy" value="${esc(auto.proxy)}" placeholder="http://127.0.0.1:5199/api/answer"/></label><p class="format-tip">先在项目目录运行 <code>npm run answer:proxy</code> 并保持窗口开启；它只转发请求，不在本地运行模型。</p>` : ''}<details class="answers-format"><summary>免费模型与 Key</summary><p>DeepSeek deepseek-flash：官方支持图片，浏览器可直连，按量计费。智谱 glm-4v-flash：免费模型，但需本地转发。通义千问 VL：开通百炼后有免费额度，浏览器可直连。Key 只保存在本页内存。</p></details><div class="answers-actions"><button class="button secondary" data-action="close">取消</button><button class="button primary" data-action="auto-solve" ${!pending ? 'disabled' : ''}>${icon('sparkles')}开始自动解答</button></div></section></div>`;
 }
 function render() {
   const paperScroll = document.querySelector('.paper-scroll')?.scrollTop || 0;
@@ -254,8 +255,9 @@ function downloadAnswers() {
 async function runAutoSolve() {
   const preset = providerById(state.auto.preset);
   const provider = {base: state.auto.base, model: state.auto.model, via: state.auto.preset === 'custom' ? (state.auto.via || 'direct') : preset.via};
-  const queue = chosen().filter(q => !(q.answer || '').trim());
-  if (!queue.length) {toast('没有需要解答的题目'); return;}
+  const isFilled = q => Boolean((q.answer || '').trim() && (q.analysis || '').trim());
+  const queue = chosen().filter(q => state.auto.overwrite || !isFilled(q));
+  if (!queue.length) {toast(state.auto.overwrite ? '没有已勾选的题目' : '所有题目都已填写，可勾选「覆盖已填写的答案」重新解答'); return;}
   if (!provider.base || !provider.model) {toast('请填写接口地址和模型名称'); return;}
   if (!state.auto.key && state.auto.preset !== 'custom') {toast('请填写 API Key'); return;}
   snapshot();
@@ -264,21 +266,45 @@ async function runAutoSolve() {
   state.message = '正在自动解答…';
   state.progress = 0;
   render();
+  const failures = [];
   let done = 0;
   try {
-    for (const q of queue) {
-      progress(`自动解答 · 第 ${done + 1} / ${queue.length} 题 · ${q.title}`, done / queue.length);
+    for (const [index, q] of queue.entries()) {
+      progress(`自动解答 · 第 ${index + 1} / ${queue.length} 题 · ${q.title}`, index / queue.length);
       const canvas = composeQuestion(q, state.pages, 1400);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       canvas.width = 0;
-      const result = await solveQuestion({provider, dataUrl, apiKey: state.auto.key, proxyUrl: state.auto.proxy});
-      q.answer = result.answer;
-      q.analysis = result.analysis;
-      done++;
+      let result = null, lastError = null;
+      // 单题失败不再中断整卷：限流 / 超时 / 网络错误最多重试 3 次，其余错误直接记录并继续。
+      for (let attempt = 1; attempt <= 3 && !result; attempt++) {
+        try {
+          result = await solveQuestion({provider, dataUrl, apiKey: state.auto.key, proxyUrl: state.auto.proxy});
+        } catch (error) {
+          lastError = error;
+          console.error(`自动解答 · ${q.title}`, error);
+          const retryable = /429|超时|Failed to fetch|无法连接|\b5\d\d\b/.test(String(error?.message || ''));
+          if (!retryable || attempt === 3) break;
+          progress(`第 ${index + 1} 题请求失败，${attempt * 3} 秒后重试…`, index / queue.length);
+          await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+        }
+      }
+      if (result) {
+        q.answer = result.answer;
+        q.analysis = result.analysis;
+        done++;
+      } else {
+        failures.push(`${q.title}（${lastError?.message || '未知错误'}）`);
+      }
       render();
     }
-    if (state.options.solutions === 'none') state.options.solutions = 'reveal';
-    toast(`已自动解答 ${done} 题，请逐题核对`);
+    if (done && state.options.solutions === 'none') state.options.solutions = 'reveal';
+    if (failures.length) {
+      state.notice = `自动解答完成 ${done} / ${queue.length} 题，${failures.length} 题失败：${failures.slice(0, 3).join('；')}${failures.length > 3 ? ' 等' : ''}。可再次点「自动解答」只重试未完成的题目。`;
+      toast(`完成 ${done} 题，${failures.length} 题失败，可直接重试`);
+    } else {
+      state.notice = '';
+      toast(`已自动解答 ${done} 题，请逐题核对`);
+    }
   } catch (error) {
     console.error(error);
     toast(`自动解答中断（已完成 ${done} 题）：${error.message || error}`);
@@ -375,6 +401,7 @@ app.addEventListener('change', event => {
     case 'question-title': if (q) {snapshot(); q.title = el.value.trim() || '未命名题目';} break;
     case 'export-title': state.options.title = el.value.trim() || state.file.name.replace(/\.[^.]+$/, ''); return;
     case 'auto-via': state.auto.via = el.value; break;
+    case 'auto-overwrite': state.auto.overwrite = el.checked; break;
     case 'headings': case 'blankSpace': state.options[el.dataset.field] = el.checked; break;
     case 'crop': if (q) {snapshot(); const i = Number(el.dataset.index); q.segments[i] = normalizeCrop({...q.segments[i], [el.dataset.key]: Number(el.value) / 100});} break;
     default: return;

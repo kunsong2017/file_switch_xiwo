@@ -19,7 +19,7 @@
     "src/export.js": "accad2eb503f7819eecd075e1bd6bd57b4881d2002862fdbd74c2d969349dbd5",
     "src/figure-seam.js": "2357e82f012b4393488c437e014e0bfffbf94b857981bdef206d624feaa18f1b",
     "src/layout.js": "c9ca5a33e81a1f13f5882e02cd70baa64068593351882baaadedb0827db9583e",
-    "src/main.js": "948bf06c7e039a8f11e9bb1b7bec08dfc54caab6e2dbd04a2ef5f8a4fe60cb8c",
+    "src/main.js": "8ce443b3b087f2891be40b4e9b5a9e399ab7c45532b68d05a8d22ac021847cc7",
     "src/math.js": "621d45d56f94dcae017ad007a25c95941a2d427687cb9b42a6d05b30a1e6734a",
     "src/offline.js": "40d608d9b996a8aa183efd79a8899d5937b2e56be5dba7466651aeacaa565534",
     "src/pdf-graphics.js": "8cc791dd438cfb8a6c55bbf92199676041caaba09fad8490371adefda18015e0",
@@ -33,7 +33,7 @@
     "使用前先看.txt": "217a5ff4b934052823e7e4b1905d19cfab9a68db143f7164c7b015a53f5785f7"
   },
   "files": {
-    "offline/index.html": "c64a516a29ffbe2c890ff5f2b54dc3f02d3d764f7a82f3f521b2e2f176779389",
+    "offline/index.html": "8dae6909549bc6aa608ff262bcb61eb6c237b2af3e6c4316de57b3849f96dbdb",
     "offline/licenses/OpenEnow.JS-MIT.txt": "fc05d728b8bace850805bd4a4f7f0cfface49f832e4b30f3ec57450e191eeba4",
     "offline/licenses/docx-preview-LICENSE": "8668bf4417d161e4eb4d47d6044526e4914d9eb3c748573d9bb7e87708c1253f",
     "offline/licenses/html-to-image-LICENSE": "9fe73723f7a9e91057f73aafc9b6a3c3b2174db2b3ddc0a3a6a8ddf2bad68e37",
